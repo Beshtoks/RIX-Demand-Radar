@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="rr_background">#081018</color>
+    <color name="rr_surface">#101B26</color>
+    <color name="rr_surface_2">#142232</color>
+    <color name="rr_stroke">#203346</color>
+
+    <color name="rr_text_primary">#F2F7FF</color>
+    <color name="rr_text_secondary">#9EB1C4</color>
+    <color name="rr_text_muted">#6F8499</color>
+
+    <color name="rr_accent">#6E4BFF</color>
+    <color name="rr_accent_2">#11C5FF</color>
+
+    <color name="rr_green">#37D67A</color>
+    <color name="rr_yellow">#F4C542</color>
+    <color name="rr_orange">#FF9F43</color>
+    <color name="rr_red">#FF5D5D</color>
+
+    <color name="rr_button_refresh">#183A52</color>
+    <color name="rr_button_ai">#35225D</color>
 </resources>
