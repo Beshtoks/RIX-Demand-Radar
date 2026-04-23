@@ -2,6 +2,8 @@ package com.rixradar.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -34,14 +36,42 @@ class MainActivity : AppCompatActivity() {
 
     private val radarDataSource: RadarDataSource = RadarRepositoryProvider.dataSource
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val refreshIntervalMs = 60_000L
+    private var isManualRefreshInProgress = false
+
+    private val autoRefreshRunnable = object : Runnable {
+        override fun run() {
+            if (!isManualRefreshInProgress) {
+                loadAndRender()
+            }
+            handler.postDelayed(this, refreshIntervalMs)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         bindViews()
         bindButtons()
-        render(radarDataSource.getDashboardState())
-        renderDataMode()
+        loadAndRender()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(autoRefreshRunnable)
+        handler.postDelayed(autoRefreshRunnable, refreshIntervalMs)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(autoRefreshRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(autoRefreshRunnable)
     }
 
     private fun bindViews() {
@@ -70,7 +100,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindButtons() {
-        btnRefresh.setOnClickListener { performRefresh() }
+        btnRefresh.setOnClickListener { performManualRefresh() }
         btnFlights.setOnClickListener { startActivity(Intent(this, FlightsActivity::class.java)) }
         btnEvents.setOnClickListener { startActivity(Intent(this, EventsActivity::class.java)) }
         btnForecast.setOnClickListener { startActivity(Intent(this, ForecastActivity::class.java)) }
@@ -78,15 +108,23 @@ class MainActivity : AppCompatActivity() {
         btnAi.setOnClickListener { startActivity(Intent(this, AiActivity::class.java)) }
     }
 
-    private fun performRefresh() {
+    private fun performManualRefresh() {
+        if (isManualRefreshInProgress) return
+
+        isManualRefreshInProgress = true
         setRefreshInProgress(true)
 
         btnRefresh.postDelayed({
-            render(radarDataSource.getDashboardState())
-            renderDataMode()
+            loadAndRender()
             setRefreshInProgress(false)
+            isManualRefreshInProgress = false
             showStub("Данные обновлены")
         }, 900)
+    }
+
+    private fun loadAndRender() {
+        render(radarDataSource.getDashboardState())
+        renderDataMode()
     }
 
     private fun setRefreshInProgress(inProgress: Boolean) {

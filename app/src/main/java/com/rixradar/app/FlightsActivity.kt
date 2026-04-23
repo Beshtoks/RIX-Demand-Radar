@@ -2,6 +2,8 @@ package com.rixradar.app
 
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -24,6 +26,16 @@ class FlightsActivity : AppCompatActivity() {
 
     private val serverClient = ServerClient()
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val refreshIntervalMs = 60_000L
+
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            loadFlights()
+            handler.postDelayed(this, refreshIntervalMs)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_flights)
@@ -33,6 +45,22 @@ class FlightsActivity : AppCompatActivity() {
 
         bindViews()
         loadFlights()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(refreshRunnable)
+        handler.postDelayed(refreshRunnable, refreshIntervalMs)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(refreshRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(refreshRunnable)
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -58,6 +86,8 @@ class FlightsActivity : AppCompatActivity() {
             val response = serverClient.fetch("/api/real-flights")
 
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+
                 if (!response.success || response.rawBody.isNullOrBlank()) {
                     tvFlightsSubtitle.text = "Сервер временно недоступен"
                     tvFlightsHint.text = response.errorMessage ?: "Не удалось получить данные"

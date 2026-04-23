@@ -91,7 +91,48 @@ class ServerRadarRepository : RadarDataSource {
     }
 
     override fun getEventsState(): EventsUiState {
-        return fallbackDataSource.getEventsState()
+        val response = serverClient.fetch(ServerConfig.EVENTS_PATH)
+        val fallback = fallbackDataSource.getEventsState()
+
+        if (!response.success) {
+            return fallback.copy(
+                subtitle = "Сервер событий временно недоступен",
+                hint = "Работаем на резервных данных"
+            )
+        }
+
+        return try {
+            val json = JSONObject(response.rawBody ?: "")
+
+            EventsUiState(
+                title = json.optStringOrDefault("title", fallback.title),
+                subtitle = json.optStringOrDefault("subtitle", fallback.subtitle),
+                blockTitle = json.optStringOrDefault("blockTitle", fallback.blockTitle),
+
+                city1 = json.optStringOrDefault("city1", fallback.city1),
+                title1 = json.optStringOrDefault("title1", fallback.title1),
+                meta1 = json.optStringOrDefault("meta1", fallback.meta1),
+
+                city2 = json.optStringOrDefault("city2", fallback.city2),
+                title2 = json.optStringOrDefault("title2", fallback.title2),
+                meta2 = json.optStringOrDefault("meta2", fallback.meta2),
+
+                city3 = json.optStringOrDefault("city3", fallback.city3),
+                title3 = json.optStringOrDefault("title3", fallback.title3),
+                meta3 = json.optStringOrDefault("meta3", fallback.meta3),
+
+                city4 = json.optStringOrDefault("city4", fallback.city4),
+                title4 = json.optStringOrDefault("title4", fallback.title4),
+                meta4 = json.optStringOrDefault("meta4", fallback.meta4),
+
+                hint = json.optStringOrDefault("hint", fallback.hint)
+            )
+        } catch (_: Exception) {
+            fallback.copy(
+                subtitle = "Ошибка чтения JSON событий",
+                hint = "Работаем на резервных данных"
+            )
+        }
     }
 
     override fun getForecastState(): ForecastUiState {

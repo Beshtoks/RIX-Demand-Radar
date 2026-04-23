@@ -2,6 +2,8 @@ package com.rixradar.app
 
 import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -9,6 +11,8 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import org.json.JSONArray
+import org.json.JSONObject
 
 class EventsActivity : AppCompatActivity() {
 
@@ -18,7 +22,17 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var layoutEventsList: LinearLayout
     private lateinit var tvEventsHint: TextView
 
-    private val radarDataSource: RadarDataSource = RadarRepositoryProvider.dataSource
+    private val serverClient = ServerClient()
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val refreshIntervalMs = 60_000L
+
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            loadEvents()
+            handler.postDelayed(this, refreshIntervalMs)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,7 +42,23 @@ class EventsActivity : AppCompatActivity() {
         supportActionBar?.title = "События"
 
         bindViews()
-        render(radarDataSource.getEventsState())
+        loadEvents()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(refreshRunnable)
+        handler.postDelayed(refreshRunnable, refreshIntervalMs)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(refreshRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(refreshRunnable)
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -44,55 +74,104 @@ class EventsActivity : AppCompatActivity() {
         tvEventsHint = findViewById(R.id.tvEventsHint)
     }
 
-    private fun render(state: EventsUiState) {
-        tvEventsTitle.text = state.title
-        tvEventsSubtitle.text = state.subtitle
-        tvEventsBlockTitle.text = state.blockTitle
-        tvEventsHint.text = state.hint
+    private fun loadEvents() {
+        tvEventsTitle.text = "Events"
+        tvEventsSubtitle.text = "Loading..."
+        tvEventsBlockTitle.text = "Events in next 30 days"
+        tvEventsHint.text = "Connecting to backend..."
 
-        layoutEventsList.removeAllViews()
+        Thread {
+            val response = serverClient.fetch(ServerConfig.EVENTS_PATH)
 
-        addEventRow(
-            city = state.city1,
-            title = state.title1,
-            meta = state.meta1
-        )
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
 
-        addEventRow(
-            city = state.city2,
-            title = state.title2,
-            meta = state.meta2
-        )
+                if (!response.success || response.rawBody.isNullOrBlank()) {
+                    tvEventsSubtitle.text = "Events server temporarily unavailable"
+                    tvEventsHint.text = response.errorMessage ?: "Could not load events"
+                    renderErrorRow("No events data")
+                    return@runOnUiThread
+                }
 
-        addEventRow(
-            city = state.city3,
-            title = state.title3,
-            meta = state.meta3
-        )
+                try {
+                    val json = JSONObject(response.rawBody)
+                    val events = json.optJSONArray("events") ?: JSONArray()
 
-        addEventRow(
-            city = state.city4,
-            title = state.title4,
-            meta = state.meta4
-        )
+                    tvEventsTitle.text = json.optStringOrDefault("title", "Events")
+                    tvEventsSubtitle.text = json.optStringOrDefault("subtitle", "Window: -1h to +30d")
+                    tvEventsBlockTitle.text = json.optStringOrDefault("blockTitle", "Events in next 30 days")
+                    tvEventsHint.text = buildHintText(json, events.length())
+
+                    renderEvents(events)
+                } catch (e: Exception) {
+                    tvEventsSubtitle.text = "Events JSON error"
+                    tvEventsHint.text = e.message ?: "Could not parse events"
+                    renderErrorRow("Could not parse events list")
+                }
+            }
+        }.start()
     }
 
-    private fun addEventRow(
-        city: String,
-        title: String,
-        meta: String
-    ) {
+    private fun renderEvents(events: JSONArray) {
+        layoutEventsList.removeAllViews()
+
+        if (events.length() == 0) {
+            renderErrorRow("No events in selected window")
+            return
+        }
+
+        for (i in 0 until events.length()) {
+            val item = events.optJSONObject(i) ?: continue
+            layoutEventsList.addView(createEventRow(item))
+        }
+    }
+
+    private fun renderErrorRow(message: String) {
+        layoutEventsList.removeAllViews()
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = getDrawable(R.color.rr_surface_2)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val tv = TextView(this).apply {
+            text = message
+            setTextColor(getColor(R.color.rr_text_primary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        }
+
+        row.addView(tv)
+        layoutEventsList.addView(row)
+    }
+
+    private fun createEventRow(item: JSONObject): LinearLayout {
+        val venue = item.optString("venue", "—")
+        val eventType = item.optString("eventType", "Event")
+        val headline = item.optString("headline", "—")
+        val countryInfo = item.optString("countryInfo", "")
+        val startTime = item.optString("startTime", "").ifBlank { "—" }
+        val endTime = item.optString("endTime", "").ifBlank { "—" }
+        val expectedVisitors = item.optInt("expectedVisitors", 0)
+        val impactScore = item.optInt("impactScore", 0)
+        val zone = item.optString("zone", "").ifBlank { "—" }
+        val source = item.optString("source", "")
+
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(8))
             background = getDrawable(R.color.rr_surface_2)
 
-            val params = LinearLayout.LayoutParams(
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            params.topMargin = dp(6)
-            layoutParams = params
+            ).apply {
+                topMargin = dp(6)
+            }
         }
 
         val topLine = LinearLayout(this).apply {
@@ -105,14 +184,14 @@ class EventsActivity : AppCompatActivity() {
         }
 
         val square = View(this).apply {
-            setBackgroundColor(getColor(eventSquareColor(meta)))
+            setBackgroundColor(getColor(eventSquareColor(impactScore)))
             layoutParams = LinearLayout.LayoutParams(dp(10), dp(10)).apply {
                 rightMargin = dp(8)
             }
         }
 
-        val tvCity = TextView(this).apply {
-            text = city
+        val tvVenue = TextView(this).apply {
+            text = venue
             setTextColor(getColor(R.color.rr_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTypeface(typeface, Typeface.BOLD)
@@ -123,7 +202,6 @@ class EventsActivity : AppCompatActivity() {
             )
         }
 
-        val eventType = extractEventType(title)
         val tvType = TextView(this).apply {
             text = eventType
             setTextColor(getColor(R.color.rr_text_secondary))
@@ -131,10 +209,22 @@ class EventsActivity : AppCompatActivity() {
         }
 
         topLine.addView(square)
-        topLine.addView(tvCity)
+        topLine.addView(tvVenue)
         topLine.addView(tvType)
 
-        val bottomLine = LinearLayout(this).apply {
+        val headlineLine = TextView(this).apply {
+            text = buildHeadlineLine(headline, countryInfo)
+            setTextColor(getColor(R.color.rr_text_primary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(3)
+            }
+        }
+
+        val middleLine = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -145,10 +235,8 @@ class EventsActivity : AppCompatActivity() {
             }
         }
 
-        val (startText, endText, zoneText) = splitMeta(meta)
-
         val tvStart = TextView(this).apply {
-            text = startText
+            text = startTime
             setTextColor(getColor(R.color.rr_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTypeface(typeface, Typeface.BOLD)
@@ -161,7 +249,7 @@ class EventsActivity : AppCompatActivity() {
         }
 
         val tvEnd = TextView(this).apply {
-            text = endText
+            text = endTime
             setTextColor(getColor(R.color.rr_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             gravity = Gravity.CENTER
@@ -172,8 +260,8 @@ class EventsActivity : AppCompatActivity() {
             )
         }
 
-        val tvZone = TextView(this).apply {
-            text = zoneText
+        val tvZoneImpact = TextView(this).apply {
+            text = "$zone  $impactScore"
             setTextColor(getColor(R.color.rr_text_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTypeface(typeface, Typeface.BOLD)
@@ -185,47 +273,77 @@ class EventsActivity : AppCompatActivity() {
             )
         }
 
-        bottomLine.addView(tvStart)
-        bottomLine.addView(tvEnd)
-        bottomLine.addView(tvZone)
+        middleLine.addView(tvStart)
+        middleLine.addView(tvEnd)
+        middleLine.addView(tvZoneImpact)
+
+        val bottomLine = TextView(this).apply {
+            text = buildBottomLine(expectedVisitors, source)
+            setTextColor(getColor(R.color.rr_text_secondary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(3)
+            }
+        }
 
         row.addView(topLine)
+        row.addView(headlineLine)
+        row.addView(middleLine)
         row.addView(bottomLine)
-        layoutEventsList.addView(row)
+
+        return row
     }
 
-    private fun extractEventType(title: String): String {
-        val t = title.lowercase()
-
+    private fun buildHeadlineLine(headline: String, countryInfo: String): String {
         return when {
-            "концерт" in t -> "Концерт"
-            "хоккей" in t -> "Хоккей"
-            "футбол" in t -> "Футбол"
-            "фестиваль" in t -> "Фестиваль"
-            "шоу" in t -> "Шоу"
-            "ярмар" in t -> "Ярмарка"
-            else -> "Событие"
+            headline.isNotBlank() && countryInfo.isNotBlank() -> "$headline   |   $countryInfo"
+            headline.isNotBlank() -> headline
+            countryInfo.isNotBlank() -> countryInfo
+            else -> "-"
         }
     }
 
-    private fun splitMeta(meta: String): Triple<String, String, String> {
-        val m = meta.trim()
+    private fun buildBottomLine(expectedVisitors: Int, source: String): String {
+        val visitorsText = if (expectedVisitors > 0) {
+            "Visitors: $expectedVisitors"
+        } else {
+            "Visitors: unknown"
+        }
 
-        return when {
-            "высокий" in m.lowercase() -> Triple("Сегодня", "Пик", "Высокий")
-            "средний" in m.lowercase() -> Triple("Сегодня", "Пик", "Средний")
-            else -> Triple("Сегодня", "Пик", "Локально")
+        return if (source.isNotBlank()) {
+            "$visitorsText | Source: $source"
+        } else {
+            visitorsText
         }
     }
 
-    private fun eventSquareColor(meta: String): Int {
-        val m = meta.lowercase()
-
+    private fun eventSquareColor(impactScore: Int): Int {
         return when {
-            "высокий" in m -> R.color.rr_red
-            "средний" in m -> R.color.rr_yellow
+            impactScore >= 80 -> R.color.rr_red
+            impactScore >= 60 -> R.color.rr_yellow
             else -> R.color.rr_green
         }
+    }
+
+    private fun JSONObject.optStringOrDefault(
+        key: String,
+        defaultValue: String
+    ): String {
+        val value = optString(key, "")
+        return if (value.isBlank()) defaultValue else value
+    }
+
+    private fun buildHintText(json: JSONObject, visibleCount: Int): String {
+        val windowStart = json.optString("windowStart", "")
+        val windowEnd = json.optString("windowEnd", "")
+        val sourceMode = json.optString("sourceMode", "")
+        val liveFetched = json.optInt("liveFetchedCount", 0)
+        val totalCount = json.optInt("count", visibleCount)
+
+        return "Window: $windowStart -> $windowEnd\nVisible: $visibleCount | Count: $totalCount | Live fetched: $liveFetched | Mode: $sourceMode"
     }
 
     private fun dp(value: Int): Int {
