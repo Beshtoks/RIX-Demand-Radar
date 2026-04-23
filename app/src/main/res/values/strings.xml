@@ -34,4 +34,131 @@
     <string name="button_open_forecast">Прогноз</string>
     <string name="button_open_map">Карта</string>
     <string name="button_open_ai">ИИ</string>
+
+    <string name="flights_title">Ближайшие прилёты RIX</string>
+    <string name="flights_subtitle">Локальный экран. Позже сюда подключим живые данные сервера.</string>
+    <string name="flights_block_title">Ожидаемые рейсы</string>
+
+    <string name="flight_card_1_route">Лондон Stansted</string>
+    <string name="flight_card_1_meta">FR7123 • Ryanair</string>
+    <string name="flight_card_1_time">По расписанию: 09:55</string>
+    <string name="flight_card_1_status">Статус: прилёт 09:47</string>
+
+    <string name="flight_card_2_route">Хельсинки</string>
+    <string name="flight_card_2_meta">BT220 • airBaltic</string>
+    <string name="flight_card_2_time">По расписанию: 10:20</string>
+    <string name="flight_card_2_status">Статус: задержка +15 минут</string>
+
+    <string name="flight_card_3_route">Варшава</string>
+    <string name="flight_card_3_meta">LO784 • LOT</string>
+    <string name="flight_card_3_time">По расписанию: 10:45</string>
+    <string name="flight_card_3_status">Статус: по расписанию</string>
+
+    <string name="flight_card_4_route">Осло</string>
+    <string name="flight_card_4_meta">DY1082 • Norwegian</string>
+    <string name="flight_card_4_time">По расписанию: 11:05</string>
+    <string name="flight_card_4_status">Статус: ожидается вовремя</string>
+
+    <string name="flight_hint">Позже здесь будут реальные прилёты, приоритет рейсов и оценка полезности для работы.</string>
+
+    <string name="events_title">Значимые события</string>
+    <string name="events_subtitle">Локальный экран. Позже сюда подключим живые данные сервера и интернет-источников.</string>
+    <string name="events_block_title">Ближайшие события</string>
+
+    <string name="event_card_1_city">Рига</string>
+    <string name="event_card_1_title">Крупный концерт в центре города</string>
+    <string name="event_card_1_meta">Сегодня • высокий приоритет</string>
+
+    <string name="event_card_2_city">Юрмала</string>
+    <string name="event_card_2_title">Повышенный туристический поток и вечернее мероприятие</string>
+    <string name="event_card_2_meta">Сегодня • высокий приоритет</string>
+
+    <string name="event_card_3_city">Сигулда</string>
+    <string name="event_card_3_title">Событие выходного дня с приезжими гостями</string>
+    <string name="event_card_3_meta">Ближайшие дни • средний приоритет</string>
+
+    <string name="event_card_4_city">Огре</string>
+    <string name="event_card_4_title">Спортивное мероприятие регионального уровня</string>
+    <string name="event_card_4_meta">Ближайшие дни • средний приоритет</string>
+
+    <string name="event_hint">Позже здесь будут реальные мероприятия, уровень значимости, ожидаемое влияние на поток и возможные направления поездок.</string>
+
+    <string name="forecast_title">Прогноз спроса</string>
+    <string name="forecast_subtitle">Локальный экран. Позже сюда подключим живой расчёт спроса от сервера.</string>
+
+    <string name="forecast_now_title">Сейчас</string>
+    <string name="forecast_now_value">Высокий спрос</string>
+    <string name="forecast_now_meta">Ближайшие 30 минут выглядят сильно</string>
+
+    <string name="forecast_hour_1_title">Через 1 час</string>
+    <string name="forecast_hour_1_value">Очень высокий</string>
+    <string name="forecast_hour_1_meta">Ожидается усиление за счёт прилётов и события</string>
+
+    <string name="forecast_hour_3_title">Через 3 часа</string>
+    <string name="forecast_hour_3_value">Средний</string>
+    <string name="forecast_hour_3_meta">После пика вероятен частичный спад</string>
+
+    <string name="forecast_best_window_title">Лучшее окно работы</string>
+    <string name="forecast_best_window_value">10:35–11:25</string>
+    <string name="forecast_best_window_meta">Наиболее перспективный интервал по текущей модели</string>
+
+    <string name="forecast_ai_title">Комментарий ИИ</string>
+    <string name="forecast_ai_text">В ближайший час есть хорошая вероятность усиленного потока у аэропорта. Причина: серия международных прилётов, событие в городе и погодный фактор.</string>
+
+    <string name="forecast_hint">Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика.</string>
+
+    <string name="map_title">Карта направлений</string>
+    <string name="map_subtitle">Локальный экран. Позже сюда подключим живую карту спроса и направления поездок.</string>
+
+    <string name="map_scheme_title">Приоритетные зоны</string>
+
+    <string name="map_zone_rix_title">Аэропорт RIX</string>
+    <string name="map_zone_rix_value">Очень высокий интерес</string>
+    <string name="map_zone_rix_meta">Ближайшие прилёты и основной входящий поток</string>
+
+    <string name="map_zone_riga_title">Рига / центр</string>
+    <string name="map_zone_riga_value">Высокий интерес</string>
+    <string name="map_zone_riga_meta">Отели, центр, мероприятия, деловые поездки</string>
+
+    <string name="map_zone_jurmala_title">Юрмала</string>
+    <string name="map_zone_jurmala_value">Высокий интерес</string>
+    <string name="map_zone_jurmala_meta">Туризм, вечерние поездки, повышенная ценность маршрута</string>
+
+    <string name="map_zone_sigulda_title">Сигулда</string>
+    <string name="map_zone_sigulda_value">Средний интерес</string>
+    <string name="map_zone_sigulda_meta">Выходные, события, гости вне Риги</string>
+
+    <string name="map_zone_ogre_title">Огре</string>
+    <string name="map_zone_ogre_value">Средний интерес</string>
+    <string name="map_zone_ogre_meta">Региональные события и часть дальних поездок</string>
+
+    <string name="map_hint">Позже здесь появятся живая география спроса, подсветка зон, направления повышенной вероятности и серверная оценка полезности поездок.</string>
+
+    <string name="ai_screen_title">Совет ИИ</string>
+    <string name="ai_screen_subtitle">Локальный экран. Позже здесь будет живая аналитика от сервера и ИИ.</string>
+
+    <string name="ai_now_title">Совет на сейчас</string>
+    <string name="ai_now_value">Ехать к аэропорту стоит</string>
+    <string name="ai_now_meta">Ближайший интервал выглядит сильнее, чем средний фон дня</string>
+
+    <string name="ai_window_title">Лучшее окно</string>
+    <string name="ai_window_value">10:35–11:25</string>
+    <string name="ai_window_meta">Наиболее благоприятный интервал по текущей модели</string>
+
+    <string name="ai_risk_title">Риск пустого ожидания</string>
+    <string name="ai_risk_value">Средний</string>
+    <string name="ai_risk_meta">После сильного окна есть вероятность локального спада</string>
+
+    <string name="ai_routes_title">Вероятные направления</string>
+    <string name="ai_routes_value">Рига центр • Юрмала • отели</string>
+    <string name="ai_routes_meta">Наиболее интересные цели по текущей симуляции спроса</string>
+
+    <string name="ai_comment_title">Пояснение</string>
+    <string name="ai_comment_text">Основной вывод: в ближайший час аэропорт выглядит выгоднее среднего. Причины: серия международных прилётов, повышенный интерес к Риге и Юрмале, а также погодный фактор.</string>
+
+    <string name="ai_hint">Позже здесь будут реальные советы, расчёт вероятности, объяснение причин, история решений и серверный ИИ-анализ.</string>
+
+    <string name="flights_web_title">Официальные рейсы RIX</string>
+    <string name="flights_web_loading">Загрузка расписания RIX...</string>
+    <string name="flights_web_error">Не удалось открыть страницу рейсов</string>
 </resources>
