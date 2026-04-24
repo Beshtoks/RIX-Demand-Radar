@@ -83,29 +83,29 @@
 
     <string name="event_hint">Позже здесь будут реальные мероприятия, уровень значимости, ожидаемое влияние на поток и возможные направления поездок.</string>
 
-    <string name="forecast_title">Прогноз спроса</string>
-    <string name="forecast_subtitle">Локальный экран. Позже сюда подключим живой расчёт спроса от сервера.</string>
+    <string name="forecast_title">Прогноз погоды</string>
+    <string name="forecast_subtitle">Прогноз RIX на 15 дней. Обновление — как у расписания рейсов.</string>
 
-    <string name="forecast_now_title">Сейчас</string>
-    <string name="forecast_now_value">Высокий спрос</string>
-    <string name="forecast_now_meta">Ближайшие 30 минут выглядят сильно</string>
+    <string name="forecast_now_title">Сегодня</string>
+    <string name="forecast_now_value">—</string>
+    <string name="forecast_now_meta">Потяни вниз, чтобы загрузить прогноз</string>
 
-    <string name="forecast_hour_1_title">Через 1 час</string>
-    <string name="forecast_hour_1_value">Очень высокий</string>
-    <string name="forecast_hour_1_meta">Ожидается усиление за счёт прилётов и события</string>
+    <string name="forecast_hour_1_title">Завтра</string>
+    <string name="forecast_hour_1_value">—</string>
+    <string name="forecast_hour_1_meta">Нет данных</string>
 
-    <string name="forecast_hour_3_title">Через 3 часа</string>
-    <string name="forecast_hour_3_value">Средний</string>
-    <string name="forecast_hour_3_meta">После пика вероятен частичный спад</string>
+    <string name="forecast_hour_3_title">Послезавтра</string>
+    <string name="forecast_hour_3_value">—</string>
+    <string name="forecast_hour_3_meta">Нет данных</string>
 
-    <string name="forecast_best_window_title">Лучшее окно работы</string>
-    <string name="forecast_best_window_value">10:35–11:25</string>
-    <string name="forecast_best_window_meta">Наиболее перспективный интервал по текущей модели</string>
+    <string name="forecast_best_window_title">15 дней</string>
+    <string name="forecast_best_window_value">Общий прогноз</string>
+    <string name="forecast_best_window_meta">Нажми, чтобы открыть подробности</string>
 
-    <string name="forecast_ai_title">Комментарий ИИ</string>
-    <string name="forecast_ai_text">В ближайший час есть хорошая вероятность усиленного потока у аэропорта. Причина: серия международных прилётов, событие в городе и погодный фактор.</string>
+    <string name="forecast_ai_title">Комментарии ИИ</string>
+    <string name="forecast_ai_text">Комментарий появится после загрузки прогноза погоды.</string>
 
-    <string name="forecast_hint">Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика.</string>
+    <string name="forecast_hint">Потяни вниз для ручного обновления. Автообновление — не чаще 1 раза в час.</string>
 
     <string name="map_title">Карта направлений</string>
     <string name="map_subtitle">Локальный экран. Позже сюда подключим живую карту спроса и направления поездок.</string>

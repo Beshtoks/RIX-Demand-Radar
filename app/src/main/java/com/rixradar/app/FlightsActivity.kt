@@ -2,13 +2,13 @@ package com.rixradar.app
 
 import android.graphics.Typeface
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
@@ -18,6 +18,7 @@ import java.time.LocalTime
 
 class FlightsActivity : AppCompatActivity() {
 
+    private lateinit var scrollFlightsRoot: ScrollView
     private lateinit var tvFlightsTitle: TextView
     private lateinit var tvFlightsSubtitle: TextView
     private lateinit var tvFlightsBlockTitle: TextView
@@ -26,14 +27,11 @@ class FlightsActivity : AppCompatActivity() {
 
     private val serverClient = ServerClient()
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val refreshIntervalMs = 60_000L
+    private var pullStartY = 0f
+    private var isLoadingFlights = false
 
-    private val refreshRunnable = object : Runnable {
-        override fun run() {
-            loadFlights()
-            handler.postDelayed(this, refreshIntervalMs)
-        }
+    private val cachePrefs by lazy {
+        getSharedPreferences(FLIGHTS_CACHE_PREFS, MODE_PRIVATE)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,23 +42,9 @@ class FlightsActivity : AppCompatActivity() {
         supportActionBar?.title = "Рейсы"
 
         bindViews()
-        loadFlights()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        handler.removeCallbacks(refreshRunnable)
-        handler.postDelayed(refreshRunnable, refreshIntervalMs)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        handler.removeCallbacks(refreshRunnable)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(refreshRunnable)
+        bindPullToRefresh()
+        renderCachedFlightsOrEmpty()
+        refreshIfCacheExpired()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -69,6 +53,7 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
+        scrollFlightsRoot = findViewById(R.id.scrollFlightsRoot)
         tvFlightsTitle = findViewById(R.id.tvFlightsTitle)
         tvFlightsSubtitle = findViewById(R.id.tvFlightsSubtitle)
         tvFlightsBlockTitle = findViewById(R.id.tvFlightsBlockTitle)
@@ -76,42 +61,121 @@ class FlightsActivity : AppCompatActivity() {
         tvFlightsHint = findViewById(R.id.tvFlightsHint)
     }
 
-    private fun loadFlights() {
-        tvFlightsTitle.text = "Прилёты RIX"
-        tvFlightsSubtitle.text = "Загрузка..."
-        tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
-        tvFlightsHint.text = "Подключение к backend..."
+    private fun bindPullToRefresh() {
+        scrollFlightsRoot.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    pullStartY = event.rawY
+                }
+
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val pulledDown = event.rawY - pullStartY
+                    if (scrollFlightsRoot.scrollY == 0 && pulledDown > dp(PULL_REFRESH_DISTANCE_DP)) {
+                        loadFlights(force = true, showLoadingText = true)
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    private fun renderCachedFlightsOrEmpty() {
+        val cachedBody = cachePrefs.getString(KEY_FLIGHTS_JSON, null)
+
+        if (cachedBody.isNullOrBlank()) {
+            tvFlightsTitle.text = "Прилёты RIX"
+            tvFlightsSubtitle.text = "Сохранённого расписания пока нет"
+            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
+            tvFlightsHint.text = "Потяни вниз, чтобы загрузить расписание"
+            renderErrorRow("Сохранённого расписания нет")
+            return
+        }
+
+        renderFlightsFromRawBody(cachedBody, fromCache = true)
+    }
+
+    private fun refreshIfCacheExpired() {
+        val lastFetchAt = cachePrefs.getLong(KEY_FLIGHTS_FETCHED_AT, 0L)
+        val hasCache = !cachePrefs.getString(KEY_FLIGHTS_JSON, null).isNullOrBlank()
+        val expired = System.currentTimeMillis() - lastFetchAt >= FLIGHTS_AUTO_REFRESH_MS
+
+        if (!hasCache || expired) {
+            loadFlights(force = false, showLoadingText = !hasCache)
+        }
+    }
+
+    private fun loadFlights(force: Boolean, showLoadingText: Boolean) {
+        if (isLoadingFlights) return
+
+        val lastFetchAt = cachePrefs.getLong(KEY_FLIGHTS_FETCHED_AT, 0L)
+        val hasCache = !cachePrefs.getString(KEY_FLIGHTS_JSON, null).isNullOrBlank()
+        val freshEnough = System.currentTimeMillis() - lastFetchAt < FLIGHTS_AUTO_REFRESH_MS
+
+        if (!force && hasCache && freshEnough) {
+            return
+        }
+
+        isLoadingFlights = true
+
+        if (showLoadingText) {
+            tvFlightsTitle.text = "Прилёты RIX"
+            tvFlightsSubtitle.text = "Обновление..."
+            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
+            tvFlightsHint.text = "Подключение к backend..."
+        } else {
+            tvFlightsHint.text = appendUpdateStatus(tvFlightsHint.text.toString(), "Фоновое обновление расписания...")
+        }
 
         Thread {
             val response = serverClient.fetch("/api/real-flights")
 
             runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
+                isLoadingFlights = false
 
                 if (!response.success || response.rawBody.isNullOrBlank()) {
-                    tvFlightsSubtitle.text = "Сервер временно недоступен"
-                    tvFlightsHint.text = response.errorMessage ?: "Не удалось получить данные"
-                    renderErrorRow("Не удалось загрузить рейсы")
+                    if (!hasCache) {
+                        tvFlightsSubtitle.text = "Сервер временно недоступен"
+                        tvFlightsHint.text = response.errorMessage ?: "Не удалось получить данные"
+                        renderErrorRow("Не удалось загрузить рейсы")
+                    } else {
+                        tvFlightsHint.text = appendUpdateStatus(
+                            tvFlightsHint.text.toString(),
+                            "Обновление не удалось: ${response.errorMessage ?: "ошибка сети"}"
+                        )
+                    }
                     return@runOnUiThread
                 }
 
-                try {
-                    val json = JSONObject(response.rawBody)
-                    val flights = json.optJSONArray("flights") ?: JSONArray()
+                cachePrefs.edit()
+                    .putString(KEY_FLIGHTS_JSON, response.rawBody)
+                    .putLong(KEY_FLIGHTS_FETCHED_AT, System.currentTimeMillis())
+                    .apply()
 
-                    tvFlightsTitle.text = "Прилёты RIX"
-                    tvFlightsSubtitle.text = "Компактный рабочий поток"
-                    tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
-                    tvFlightsHint.text = buildHintText(json, flights.length())
-
-                    renderFlights(flights)
-                } catch (e: Exception) {
-                    tvFlightsSubtitle.text = "Ошибка чтения JSON"
-                    tvFlightsHint.text = e.message ?: "Не удалось разобрать ответ"
-                    renderErrorRow("Ошибка разбора списка рейсов")
-                }
+                renderFlightsFromRawBody(response.rawBody, fromCache = false)
             }
         }.start()
+    }
+
+    private fun renderFlightsFromRawBody(rawBody: String, fromCache: Boolean) {
+        try {
+            val json = JSONObject(rawBody)
+            val flights = json.optJSONArray("flights") ?: JSONArray()
+
+            tvFlightsTitle.text = "Прилёты RIX"
+            tvFlightsSubtitle.text = if (fromCache) {
+                "Сохранённое расписание"
+            } else {
+                "Расписание обновлено"
+            }
+            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
+            tvFlightsHint.text = buildHintText(json, flights.length(), fromCache)
+
+            renderFlights(flights)
+        } catch (e: Exception) {
+            tvFlightsSubtitle.text = "Ошибка чтения JSON"
+            tvFlightsHint.text = e.message ?: "Не удалось разобрать ответ"
+            renderErrorRow("Ошибка разбора списка рейсов")
+        }
     }
 
     private fun renderFlights(flights: JSONArray) {
@@ -298,11 +362,17 @@ class FlightsActivity : AppCompatActivity() {
         }
     }
 
-    private fun buildHintText(json: JSONObject, count: Int): String {
+    private fun buildHintText(json: JSONObject, count: Int, fromCache: Boolean): String {
         val sourceUrl = json.optString("sourceUrl", "")
         val windowStart = json.optString("windowStart", "")
         val windowEnd = json.optString("windowEnd", "")
-        return "Источник: $sourceUrl\nОкно: $windowStart → $windowEnd\nРейсов: $count"
+        val cacheStatus = if (fromCache) "сохранённые данные" else "обновлено с backend"
+        return "Источник: $sourceUrl\nОкно: $windowStart → $windowEnd\nРейсов: $count\nРежим: $cacheStatus"
+    }
+
+    private fun appendUpdateStatus(oldText: String, status: String): String {
+        val base = oldText.substringBefore("\nСтатус:")
+        return "$base\nСтатус: $status"
     }
 
     private fun dp(value: Int): Int {
@@ -311,5 +381,13 @@ class FlightsActivity : AppCompatActivity() {
             value.toFloat(),
             resources.displayMetrics
         ).toInt()
+    }
+
+    companion object {
+        private const val FLIGHTS_CACHE_PREFS = "rix_flights_cache"
+        private const val KEY_FLIGHTS_JSON = "flights_json"
+        private const val KEY_FLIGHTS_FETCHED_AT = "flights_fetched_at"
+        private const val FLIGHTS_AUTO_REFRESH_MS = 60L * 60L * 1000L
+        private const val PULL_REFRESH_DISTANCE_DP = 72
     }
 }

@@ -28,6 +28,11 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".Weather15Activity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".EventsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

@@ -128,13 +128,14 @@ class EventsActivity : AppCompatActivity() {
         try {
             val json = JSONObject(rawJson)
             val events = json.optJSONArray("events") ?: JSONArray()
+            val visibleEvents = filterVisibleEvents(events)
 
             tvEventsTitle.text = json.optStringOrDefault("title", "Events")
             tvEventsSubtitle.text = json.optStringOrDefault("subtitle", "Window: -1h to +30d")
             tvEventsBlockTitle.text = json.optStringOrDefault("blockTitle", "Events in next 30 days")
-            tvEventsHint.text = buildHintText(json, events.length(), fromCache)
+            tvEventsHint.text = buildHintText(json, visibleEvents.length(), fromCache)
 
-            renderEvents(events)
+            renderEvents(visibleEvents)
         } catch (e: Exception) {
             tvEventsTitle.text = "Events"
             tvEventsSubtitle.text = "Saved events JSON error"
@@ -156,6 +157,41 @@ class EventsActivity : AppCompatActivity() {
             val item = events.optJSONObject(i) ?: continue
             layoutEventsList.addView(createEventRow(item))
         }
+    }
+
+    private fun filterVisibleEvents(events: JSONArray): JSONArray {
+        val result = JSONArray()
+
+        for (i in 0 until events.length()) {
+            val item = events.optJSONObject(i) ?: continue
+            if (shouldShowEvent(item)) {
+                result.put(item)
+            }
+        }
+
+        return result
+    }
+
+    private fun shouldShowEvent(item: JSONObject): Boolean {
+        val venue = item.optString("venue", "").lowercase()
+        val headline = item.optString("headline", "").lowercase()
+        val eventType = item.optString("eventType", "").lowercase()
+        val source = item.optString("source", "").lowercase()
+        val combined = "$venue $headline $eventType $source"
+
+        val blockedTerms = listOf(
+            "mihaila čehova",
+            "mihaila cehova",
+            "čehova rīgas krievu teātris",
+            "cehova rigas krievu teatris",
+            "rīgas krievu teātris",
+            "rigas krievu teatris",
+            "restorāns",
+            "restorans",
+            "restaurant"
+        )
+
+        return blockedTerms.none { blocked -> combined.contains(blocked) }
     }
 
     private fun renderErrorRow(message: String) {
