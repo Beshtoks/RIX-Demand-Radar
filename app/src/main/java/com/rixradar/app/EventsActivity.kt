@@ -2,13 +2,13 @@ package com.rixradar.app
 
 import android.graphics.Typeface
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
@@ -21,18 +21,12 @@ class EventsActivity : AppCompatActivity() {
     private lateinit var tvEventsBlockTitle: TextView
     private lateinit var layoutEventsList: LinearLayout
     private lateinit var tvEventsHint: TextView
+    private lateinit var rootScrollView: ScrollView
 
     private val serverClient = ServerClient()
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val refreshIntervalMs = 60_000L
-
-    private val refreshRunnable = object : Runnable {
-        override fun run() {
-            loadEvents()
-            handler.postDelayed(this, refreshIntervalMs)
-        }
-    }
+    private var touchStartY = 0f
+    private var refreshInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,23 +36,8 @@ class EventsActivity : AppCompatActivity() {
         supportActionBar?.title = "События"
 
         bindViews()
-        loadEvents()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        handler.removeCallbacks(refreshRunnable)
-        handler.postDelayed(refreshRunnable, refreshIntervalMs)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        handler.removeCallbacks(refreshRunnable)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(refreshRunnable)
+        bindPullToRefresh()
+        renderCachedEvents()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -72,13 +51,52 @@ class EventsActivity : AppCompatActivity() {
         tvEventsBlockTitle = findViewById(R.id.tvEventsBlockTitle)
         layoutEventsList = findViewById(R.id.layoutEventsList)
         tvEventsHint = findViewById(R.id.tvEventsHint)
+
+        rootScrollView = findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ScrollView
     }
 
-    private fun loadEvents() {
-        tvEventsTitle.text = "Events"
-        tvEventsSubtitle.text = "Loading..."
-        tvEventsBlockTitle.text = "Events in next 30 days"
-        tvEventsHint.text = "Connecting to backend..."
+    private fun bindPullToRefresh() {
+        rootScrollView.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchStartY = event.rawY
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    val dy = event.rawY - touchStartY
+                    val isAtTop = rootScrollView.scrollY == 0
+                    val isPullDown = dy > dp(70)
+
+                    if (isAtTop && isPullDown && !refreshInProgress) {
+                        refreshEventsFromServer()
+                    }
+                }
+            }
+
+            view.performClick()
+            false
+        }
+    }
+
+    private fun renderCachedEvents() {
+        val cachedJson = getCachedEventsJson()
+
+        if (cachedJson.isNullOrBlank()) {
+            tvEventsTitle.text = "Events"
+            tvEventsSubtitle.text = "Saved events not loaded yet"
+            tvEventsBlockTitle.text = "Events in next 30 days"
+            tvEventsHint.text = "Потяни список вниз, чтобы загрузить мероприятия с сервера. После успешной загрузки они будут сохранены."
+            renderErrorRow("Нет сохранённого расписания")
+            return
+        }
+
+        renderRawJson(cachedJson, fromCache = true)
+    }
+
+    private fun refreshEventsFromServer() {
+        refreshInProgress = true
+        tvEventsSubtitle.text = "Updating events..."
+        tvEventsHint.text = "Загружаю свежие мероприятия с сервера..."
 
         Thread {
             val response = serverClient.fetch(ServerConfig.EVENTS_PATH)
@@ -86,30 +104,44 @@ class EventsActivity : AppCompatActivity() {
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
 
+                refreshInProgress = false
+
                 if (!response.success || response.rawBody.isNullOrBlank()) {
                     tvEventsSubtitle.text = "Events server temporarily unavailable"
                     tvEventsHint.text = response.errorMessage ?: "Could not load events"
-                    renderErrorRow("No events data")
                     return@runOnUiThread
                 }
 
                 try {
-                    val json = JSONObject(response.rawBody)
-                    val events = json.optJSONArray("events") ?: JSONArray()
-
-                    tvEventsTitle.text = json.optStringOrDefault("title", "Events")
-                    tvEventsSubtitle.text = json.optStringOrDefault("subtitle", "Window: -1h to +30d")
-                    tvEventsBlockTitle.text = json.optStringOrDefault("blockTitle", "Events in next 30 days")
-                    tvEventsHint.text = buildHintText(json, events.length())
-
-                    renderEvents(events)
+                    JSONObject(response.rawBody)
+                    saveCachedEventsJson(response.rawBody)
+                    renderRawJson(response.rawBody, fromCache = false)
                 } catch (e: Exception) {
                     tvEventsSubtitle.text = "Events JSON error"
                     tvEventsHint.text = e.message ?: "Could not parse events"
-                    renderErrorRow("Could not parse events list")
                 }
             }
         }.start()
+    }
+
+    private fun renderRawJson(rawJson: String, fromCache: Boolean) {
+        try {
+            val json = JSONObject(rawJson)
+            val events = json.optJSONArray("events") ?: JSONArray()
+
+            tvEventsTitle.text = json.optStringOrDefault("title", "Events")
+            tvEventsSubtitle.text = json.optStringOrDefault("subtitle", "Window: -1h to +30d")
+            tvEventsBlockTitle.text = json.optStringOrDefault("blockTitle", "Events in next 30 days")
+            tvEventsHint.text = buildHintText(json, events.length(), fromCache)
+
+            renderEvents(events)
+        } catch (e: Exception) {
+            tvEventsTitle.text = "Events"
+            tvEventsSubtitle.text = "Saved events JSON error"
+            tvEventsBlockTitle.text = "Events in next 30 days"
+            tvEventsHint.text = e.message ?: "Could not parse saved events"
+            renderErrorRow("Ошибка сохранённого расписания")
+        }
     }
 
     private fun renderEvents(events: JSONArray) {
@@ -154,6 +186,7 @@ class EventsActivity : AppCompatActivity() {
         val eventType = item.optString("eventType", "Event")
         val headline = item.optString("headline", "—")
         val countryInfo = item.optString("countryInfo", "")
+        val dateShort = item.optString("dateShort", item.optString("eventDate", ""))
         val startTime = item.optString("startTime", "").ifBlank { "—" }
         val endTime = item.optString("endTime", "").ifBlank { "—" }
         val expectedVisitors = item.optInt("expectedVisitors", 0)
@@ -235,8 +268,8 @@ class EventsActivity : AppCompatActivity() {
             }
         }
 
-        val tvStart = TextView(this).apply {
-            text = startTime
+        val tvDateStart = TextView(this).apply {
+            text = if (dateShort.isNotBlank()) "$dateShort  $startTime" else startTime
             setTextColor(getColor(R.color.rr_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTypeface(typeface, Typeface.BOLD)
@@ -273,7 +306,7 @@ class EventsActivity : AppCompatActivity() {
             )
         }
 
-        middleLine.addView(tvStart)
+        middleLine.addView(tvDateStart)
         middleLine.addView(tvEnd)
         middleLine.addView(tvZoneImpact)
 
@@ -336,14 +369,25 @@ class EventsActivity : AppCompatActivity() {
         return if (value.isBlank()) defaultValue else value
     }
 
-    private fun buildHintText(json: JSONObject, visibleCount: Int): String {
+    private fun buildHintText(json: JSONObject, visibleCount: Int, fromCache: Boolean): String {
         val windowStart = json.optString("windowStart", "")
         val windowEnd = json.optString("windowEnd", "")
         val sourceMode = json.optString("sourceMode", "")
-        val liveFetched = json.optInt("liveFetchedCount", 0)
         val totalCount = json.optInt("count", visibleCount)
+        val cacheText = if (fromCache) "Saved" else "Fresh"
 
-        return "Window: $windowStart -> $windowEnd\nVisible: $visibleCount | Count: $totalCount | Live fetched: $liveFetched | Mode: $sourceMode"
+        return "$cacheText | Window: $windowStart -> $windowEnd\nVisible: $visibleCount | Count: $totalCount | Mode: $sourceMode"
+    }
+
+    private fun getCachedEventsJson(): String? {
+        return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_EVENTS_JSON, null)
+    }
+
+    private fun saveCachedEventsJson(rawJson: String) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_EVENTS_JSON, rawJson)
+            .apply()
     }
 
     private fun dp(value: Int): Int {
@@ -352,5 +396,10 @@ class EventsActivity : AppCompatActivity() {
             value.toFloat(),
             resources.displayMetrics
         ).toInt()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "rix_events_cache"
+        private const val KEY_EVENTS_JSON = "events_json"
     }
 }

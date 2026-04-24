@@ -1,10 +1,12 @@
 package com.rixradar.app
 
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class ServerClient {
 
@@ -21,9 +23,11 @@ class ServerClient {
                     val url = URL(urlString)
                     connection = (url.openConnection() as HttpURLConnection).apply {
                         requestMethod = "GET"
-                        connectTimeout = 5000
-                        readTimeout = 5000
+                        connectTimeout = 15_000
+                        readTimeout = 45_000
                         setRequestProperty("Accept", "application/json")
+                        setRequestProperty("User-Agent", "RIXDemandRadar-Android/1.0")
+                        setRequestProperty("Cache-Control", "no-cache")
                         doInput = true
                     }
 
@@ -51,6 +55,13 @@ class ServerClient {
                             errorMessage = "HTTP $responseCode"
                         )
                     }
+                } catch (e: SocketTimeoutException) {
+                    ServerFetchResult(
+                        success = false,
+                        url = urlString,
+                        rawBody = null,
+                        errorMessage = "Timeout while waiting for server response"
+                    )
                 } catch (e: Exception) {
                     ServerFetchResult(
                         success = false,
@@ -65,7 +76,15 @@ class ServerClient {
         )
 
         return try {
-            future.get(6, TimeUnit.SECONDS)
+            future.get(60, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            ServerFetchResult(
+                success = false,
+                url = urlString,
+                rawBody = null,
+                errorMessage = "Client timeout while waiting for backend"
+            )
         } catch (e: Exception) {
             future.cancel(true)
             ServerFetchResult(

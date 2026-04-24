@@ -2,8 +2,6 @@ package com.rixradar.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -35,19 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAi: Button
 
     private val radarDataSource: RadarDataSource = RadarRepositoryProvider.dataSource
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val refreshIntervalMs = 60_000L
-    private var isManualRefreshInProgress = false
-
-    private val autoRefreshRunnable = object : Runnable {
-        override fun run() {
-            if (!isManualRefreshInProgress) {
-                loadAndRender()
-            }
-            handler.postDelayed(this, refreshIntervalMs)
-        }
-    }
+    private val startupFallbackDataSource: RadarDataSource = FakeServerRadarRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,23 +41,10 @@ class MainActivity : AppCompatActivity() {
 
         bindViews()
         bindButtons()
-        loadAndRender()
-    }
 
-    override fun onResume() {
-        super.onResume()
-        handler.removeCallbacks(autoRefreshRunnable)
-        handler.postDelayed(autoRefreshRunnable, refreshIntervalMs)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        handler.removeCallbacks(autoRefreshRunnable)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(autoRefreshRunnable)
+        render(startupFallbackDataSource.getDashboardState())
+        renderDataMode("Режим данных: SERVER / загрузка...")
+        loadDashboardFromServer(showToastOnFinish = false)
     }
 
     private fun bindViews() {
@@ -100,7 +73,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindButtons() {
-        btnRefresh.setOnClickListener { performManualRefresh() }
+        btnRefresh.setOnClickListener { performRefresh() }
         btnFlights.setOnClickListener { startActivity(Intent(this, FlightsActivity::class.java)) }
         btnEvents.setOnClickListener { startActivity(Intent(this, EventsActivity::class.java)) }
         btnForecast.setOnClickListener { startActivity(Intent(this, ForecastActivity::class.java)) }
@@ -108,26 +81,36 @@ class MainActivity : AppCompatActivity() {
         btnAi.setOnClickListener { startActivity(Intent(this, AiActivity::class.java)) }
     }
 
-    private fun performManualRefresh() {
-        if (isManualRefreshInProgress) return
-
-        isManualRefreshInProgress = true
+    private fun performRefresh() {
         setRefreshInProgress(true)
-
-        btnRefresh.postDelayed({
-            loadAndRender()
-            setRefreshInProgress(false)
-            isManualRefreshInProgress = false
-            showStub("Данные обновлены")
-        }, 900)
+        loadDashboardFromServer(showToastOnFinish = true)
     }
 
-    private fun loadAndRender() {
-        render(radarDataSource.getDashboardState())
-        renderDataMode()
+    private fun loadDashboardFromServer(showToastOnFinish: Boolean) {
+        Thread {
+            val state = try {
+                radarDataSource.getDashboardState()
+            } catch (_: Exception) {
+                startupFallbackDataSource.getDashboardState().copy(
+                    updatedText = "Обновлено: server dashboard error"
+                )
+            }
+
+            runOnUiThread {
+                render(state)
+                renderDataMode()
+                setRefreshInProgress(false)
+
+                if (showToastOnFinish) {
+                    showStub("Данные обновлены")
+                }
+            }
+        }.start()
     }
 
     private fun setRefreshInProgress(inProgress: Boolean) {
+        if (!::btnRefresh.isInitialized) return
+
         btnRefresh.isEnabled = !inProgress
         btnRefresh.text = if (inProgress) "Обновление..." else getString(R.string.button_refresh)
     }
@@ -149,8 +132,8 @@ class MainActivity : AppCompatActivity() {
         tvAiText.text = state.aiText
     }
 
-    private fun renderDataMode() {
-        tvDataMode.text = "Режим данных: ${RadarRepositoryProvider.currentMode.name}"
+    private fun renderDataMode(customText: String? = null) {
+        tvDataMode.text = customText ?: "Режим данных: ${RadarRepositoryProvider.currentMode.name}"
     }
 
     private fun showStub(message: String) {
