@@ -4,17 +4,22 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequest
+import androidx.work.WorkManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalTime
+import java.util.concurrent.TimeUnit
 
 class FlightsActivity : AppCompatActivity() {
 
@@ -22,12 +27,12 @@ class FlightsActivity : AppCompatActivity() {
     private lateinit var tvFlightsTitle: TextView
     private lateinit var tvFlightsSubtitle: TextView
     private lateinit var tvFlightsBlockTitle: TextView
+    private lateinit var btnFlightsRefresh: Button
     private lateinit var layoutFlightsList: LinearLayout
     private lateinit var tvFlightsHint: TextView
 
     private val serverClient = ServerClient()
 
-    private var pullStartY = 0f
     private var isLoadingFlights = false
 
     private val cachePrefs by lazy {
@@ -42,7 +47,8 @@ class FlightsActivity : AppCompatActivity() {
         supportActionBar?.title = "Рейсы"
 
         bindViews()
-        bindPullToRefresh()
+        bindRefreshButton()
+        scheduleHourlyFlightsRefresh()
         renderCachedFlightsOrEmpty()
         refreshIfCacheExpired()
     }
@@ -57,26 +63,29 @@ class FlightsActivity : AppCompatActivity() {
         tvFlightsTitle = findViewById(R.id.tvFlightsTitle)
         tvFlightsSubtitle = findViewById(R.id.tvFlightsSubtitle)
         tvFlightsBlockTitle = findViewById(R.id.tvFlightsBlockTitle)
+        btnFlightsRefresh = findViewById(R.id.btnFlightsRefresh)
         layoutFlightsList = findViewById(R.id.layoutFlightsList)
         tvFlightsHint = findViewById(R.id.tvFlightsHint)
     }
 
-    private fun bindPullToRefresh() {
-        scrollFlightsRoot.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    pullStartY = event.rawY
-                }
-
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val pulledDown = event.rawY - pullStartY
-                    if (scrollFlightsRoot.scrollY == 0 && pulledDown > dp(PULL_REFRESH_DISTANCE_DP)) {
-                        loadFlights(force = true, showLoadingText = true)
-                    }
-                }
-            }
-            false
+    private fun bindRefreshButton() {
+        btnFlightsRefresh.setOnClickListener {
+            loadFlights(force = true, showLoadingText = true)
         }
+    }
+
+    private fun scheduleHourlyFlightsRefresh() {
+        val request = PeriodicWorkRequest.Builder(
+            FlightsRefreshWorker::class.java,
+            1,
+            TimeUnit.HOURS
+        ).build()
+
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            FLIGHTS_PERIODIC_WORK_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
     }
 
     private fun renderCachedFlightsOrEmpty() {
@@ -85,8 +94,8 @@ class FlightsActivity : AppCompatActivity() {
         if (cachedBody.isNullOrBlank()) {
             tvFlightsTitle.text = "Прилёты RIX"
             tvFlightsSubtitle.text = "Сохранённого расписания пока нет"
-            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
-            tvFlightsHint.text = "Потяни вниз, чтобы загрузить расписание"
+            tvFlightsBlockTitle.text = "Окно: Šodien + Rīt"
+            tvFlightsHint.text = "Нажми «Обновить», чтобы загрузить полное расписание"
             renderErrorRow("Сохранённого расписания нет")
             return
         }
@@ -116,11 +125,12 @@ class FlightsActivity : AppCompatActivity() {
         }
 
         isLoadingFlights = true
+        btnFlightsRefresh.isEnabled = false
 
         if (showLoadingText) {
             tvFlightsTitle.text = "Прилёты RIX"
             tvFlightsSubtitle.text = "Обновление..."
-            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
+            tvFlightsBlockTitle.text = "Окно: Šodien + Rīt"
             tvFlightsHint.text = "Подключение к backend..."
         } else {
             tvFlightsHint.text = appendUpdateStatus(tvFlightsHint.text.toString(), "Фоновое обновление расписания...")
@@ -131,6 +141,7 @@ class FlightsActivity : AppCompatActivity() {
 
             runOnUiThread {
                 isLoadingFlights = false
+                btnFlightsRefresh.isEnabled = true
 
                 if (!response.success || response.rawBody.isNullOrBlank()) {
                     if (!hasCache) {
@@ -146,6 +157,21 @@ class FlightsActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
 
+                val accepted = responseContainsUsableFullList(response.rawBody)
+                if (!accepted) {
+                    if (!hasCache) {
+                        tvFlightsSubtitle.text = "Backend вернул неполный список"
+                        tvFlightsHint.text = "Ответ backend получен, но список рейсов пустой или повреждён"
+                        renderErrorRow("Полное расписание не получено")
+                    } else {
+                        tvFlightsHint.text = appendUpdateStatus(
+                            tvFlightsHint.text.toString(),
+                            "Backend вернул неполный список, оставлены сохранённые данные"
+                        )
+                    }
+                    return@runOnUiThread
+                }
+
                 cachePrefs.edit()
                     .putString(KEY_FLIGHTS_JSON, response.rawBody)
                     .putLong(KEY_FLIGHTS_FETCHED_AT, System.currentTimeMillis())
@@ -154,6 +180,17 @@ class FlightsActivity : AppCompatActivity() {
                 renderFlightsFromRawBody(response.rawBody, fromCache = false)
             }
         }.start()
+    }
+
+    private fun responseContainsUsableFullList(rawBody: String): Boolean {
+        return try {
+            val json = JSONObject(rawBody)
+            val ok = json.optBoolean("ok", false)
+            val flights = json.optJSONArray("flights") ?: JSONArray()
+            ok && flights.length() > 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun renderFlightsFromRawBody(rawBody: String, fromCache: Boolean) {
@@ -167,10 +204,11 @@ class FlightsActivity : AppCompatActivity() {
             } else {
                 "Расписание обновлено"
             }
-            tvFlightsBlockTitle.text = "Окно: от -1 часа до +24 часов"
-            tvFlightsHint.text = buildHintText(json, flights.length(), fromCache)
+            tvFlightsBlockTitle.text = "Окно: Šodien + Rīt"
+            tvFlightsHint.text = buildHintText(json, flights, fromCache)
 
             renderFlights(flights)
+            scrollToWorkingStart(flights)
         } catch (e: Exception) {
             tvFlightsSubtitle.text = "Ошибка чтения JSON"
             tvFlightsHint.text = e.message ?: "Не удалось разобрать ответ"
@@ -186,10 +224,149 @@ class FlightsActivity : AppCompatActivity() {
             return
         }
 
+        var previousDayKey = ""
+
         for (i in 0 until flights.length()) {
             val item = flights.optJSONObject(i) ?: continue
+            val currentDayKey = dayKey(item)
+
+            if (currentDayKey != previousDayKey) {
+                layoutFlightsList.addView(createDayHeader(dayTitle(item)))
+                previousDayKey = currentDayKey
+            }
+
             layoutFlightsList.addView(createCompactFlightRow(item))
         }
+    }
+
+    private fun createDayHeader(title: String): TextView {
+        return TextView(this).apply {
+            text = title
+            setTextColor(getColor(R.color.rr_text_primary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(12), dp(2), dp(4))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+    }
+
+    private fun dayKey(item: JSONObject): String {
+        val label = item.optString("dayLabel", "").trim()
+        if (label.isNotBlank()) return label.lowercase()
+
+        val flightDate = item.optString("flightDate", "").trim()
+        if (flightDate.isNotBlank()) return flightDate
+
+        val baseDay = item.optString("_base_day", "").trim()
+        if (baseDay.isNotBlank()) return baseDay
+
+        return "unknown"
+    }
+
+    private fun dayTitle(item: JSONObject): String {
+        val label = item.optString("dayLabel", "").trim()
+        val flightDate = item.optString("flightDate", "").trim()
+        val normalized = label.lowercase()
+
+        return when {
+            normalized == "šodien" || normalized == "sodien" -> {
+                if (flightDate.isBlank()) "Šodien" else "Šodien • $flightDate"
+            }
+            normalized == "rīt" || normalized == "rit" -> {
+                if (flightDate.isBlank()) "Rīt" else "Rīt • $flightDate"
+            }
+            flightDate.isNotBlank() -> flightDate
+            label.isNotBlank() -> label
+            else -> "Расписание"
+        }
+    }
+
+    private fun scrollToWorkingStart(flights: JSONArray) {
+        if (flights.length() == 0) return
+
+        val targetFlightIndex = findWorkingStartIndex(flights)
+        val targetViewIndex = targetFlightIndex + headerCountBeforeIndex(flights, targetFlightIndex)
+
+        if (targetViewIndex <= 0) {
+            scrollFlightsRoot.post {
+                scrollFlightsRoot.scrollTo(0, 0)
+            }
+            return
+        }
+
+        scrollFlightsRoot.post {
+            val targetView = layoutFlightsList.getChildAt(targetViewIndex)
+            if (targetView != null) {
+                val topOffset = targetView.top - dp(4)
+                scrollFlightsRoot.scrollTo(0, topOffset.coerceAtLeast(0))
+            }
+        }
+    }
+
+    private fun headerCountBeforeIndex(flights: JSONArray, targetIndex: Int): Int {
+        var headers = 0
+        var previousDayKey = ""
+
+        for (i in 0..targetIndex.coerceAtMost(flights.length() - 1)) {
+            val item = flights.optJSONObject(i) ?: continue
+            val currentDayKey = dayKey(item)
+            if (currentDayKey != previousDayKey) {
+                headers++
+                previousDayKey = currentDayKey
+            }
+        }
+
+        return headers
+    }
+
+    private fun findWorkingStartIndex(flights: JSONArray): Int {
+        val nowMinusOneHour = LocalTime.now().minusHours(1)
+        val today = todayIsoDate()
+        var firstTomorrowIndex = -1
+
+        for (i in 0 until flights.length()) {
+            val item = flights.optJSONObject(i) ?: continue
+            val dayLabel = item.optString("dayLabel", "").trim().lowercase()
+            val flightDate = item.optString("flightDate", "").trim()
+            val baseDay = item.optString("_base_day", "").trim()
+            val dayIsTomorrow = dayLabel == "rīt" || dayLabel == "rit" ||
+                (flightDate.isNotBlank() && flightDate != today) ||
+                (baseDay.isNotBlank() && baseDay != today)
+
+            if (dayIsTomorrow) {
+                if (firstTomorrowIndex < 0) {
+                    firstTomorrowIndex = i
+                }
+                continue
+            }
+
+            val scheduled = item.optString("scheduledTime", "")
+            val actual = item.optString("actualTime", "")
+            val referenceTimeText = scheduled.ifBlank { actual }
+
+            if (referenceTimeText.isBlank()) {
+                continue
+            }
+
+            try {
+                val referenceTime = LocalTime.parse(referenceTimeText)
+                if (!referenceTime.isBefore(nowMinusOneHour)) {
+                    return i
+                }
+            } catch (_: Exception) {
+                continue
+            }
+        }
+
+        return if (firstTomorrowIndex >= 0) firstTomorrowIndex else 0
+    }
+
+    private fun todayIsoDate(): String {
+        return LocalDate.now().toString()
     }
 
     private fun renderErrorRow(message: String) {
@@ -362,12 +539,42 @@ class FlightsActivity : AppCompatActivity() {
         }
     }
 
-    private fun buildHintText(json: JSONObject, count: Int, fromCache: Boolean): String {
+    private fun buildHintText(json: JSONObject, flights: JSONArray, fromCache: Boolean): String {
         val sourceUrl = json.optString("sourceUrl", "")
         val windowStart = json.optString("windowStart", "")
         val windowEnd = json.optString("windowEnd", "")
+        val scheduleMode = json.optString("scheduleMode", "Sodien+Rit")
         val cacheStatus = if (fromCache) "сохранённые данные" else "обновлено с backend"
-        return "Источник: $sourceUrl\nОкно: $windowStart → $windowEnd\nРейсов: $count\nРежим: $cacheStatus"
+        val counts = countByDay(flights)
+
+        return "Сегодня: ${counts.today} | Завтра: ${counts.tomorrow} | Всего: ${flights.length()}\n" +
+            "Источник: $sourceUrl\n" +
+            "Окно: $windowStart → $windowEnd\n" +
+            "Расписание: $scheduleMode\n" +
+            "Режим: $cacheStatus"
+    }
+
+    private fun countByDay(flights: JSONArray): DayCounts {
+        var todayCount = 0
+        var tomorrowCount = 0
+        val today = todayIsoDate()
+
+        for (i in 0 until flights.length()) {
+            val item = flights.optJSONObject(i) ?: continue
+            val label = item.optString("dayLabel", "").trim().lowercase()
+            val flightDate = item.optString("flightDate", "").trim()
+            val baseDay = item.optString("_base_day", "").trim()
+
+            when {
+                label == "rīt" || label == "rit" -> tomorrowCount++
+                label == "šodien" || label == "sodien" -> todayCount++
+                flightDate.isNotBlank() && flightDate != today -> tomorrowCount++
+                baseDay.isNotBlank() && baseDay != today -> tomorrowCount++
+                else -> todayCount++
+            }
+        }
+
+        return DayCounts(today = todayCount, tomorrow = tomorrowCount)
     }
 
     private fun appendUpdateStatus(oldText: String, status: String): String {
@@ -383,11 +590,16 @@ class FlightsActivity : AppCompatActivity() {
         ).toInt()
     }
 
+    data class DayCounts(
+        val today: Int,
+        val tomorrow: Int
+    )
+
     companion object {
-        private const val FLIGHTS_CACHE_PREFS = "rix_flights_cache"
+        private const val FLIGHTS_CACHE_PREFS = "rix_flights_cache_full_v1"
         private const val KEY_FLIGHTS_JSON = "flights_json"
         private const val KEY_FLIGHTS_FETCHED_AT = "flights_fetched_at"
         private const val FLIGHTS_AUTO_REFRESH_MS = 60L * 60L * 1000L
-        private const val PULL_REFRESH_DISTANCE_DP = 72
+        private const val FLIGHTS_PERIODIC_WORK_NAME = "rix_flights_hourly_refresh"
     }
 }

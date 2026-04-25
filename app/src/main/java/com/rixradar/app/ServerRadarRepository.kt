@@ -194,17 +194,28 @@ class ServerRadarRepository : RadarDataSource {
     }
 
     private fun fetchArrivalsForDemand(): List<ArrivalPoint> {
+        val nowMillis = System.currentTimeMillis()
+        val cachedRaw = cachedFlightsRawBody
+
+        if (!cachedRaw.isNullOrBlank() && nowMillis - cachedFlightsSavedAtMillis < AIRPORT_FLOW_CACHE_MS) {
+            val parsed = tryParseArrivals(cachedRaw)
+            if (parsed.isNotEmpty()) {
+                return normalizeArrivalOrder(parsed).take(MAX_ARRIVALS_FOR_DEMAND)
+            }
+        }
+
         val responses = listOf(
             serverClient.fetch("/api/real-flights"),
             serverClient.fetch(ServerConfig.FLIGHTS_PATH)
         )
 
         for (response in responses) {
-            if (!response.success) continue
+            if (!response.success || response.rawBody.isNullOrBlank()) continue
 
-            val parsed = tryParseArrivals(response.rawBody ?: "")
+            val parsed = tryParseArrivals(response.rawBody)
             if (parsed.isNotEmpty()) {
-                return normalizeArrivalOrder(parsed).take(30)
+                cacheFlightsRawBody(response.rawBody)
+                return normalizeArrivalOrder(parsed).take(MAX_ARRIVALS_FOR_DEMAND)
             }
         }
 
@@ -383,11 +394,21 @@ class ServerRadarRepository : RadarDataSource {
         LOW("Низкий поток", "🟩")
     }
 
-    private companion object {
-        const val MAX_ARRIVALS_FOR_DEMAND = 30
-        const val MIN_POINTS_FOR_DEMAND = 5
-        const val MIN_WINDOW_SIZE = 5
-        const val MAX_WINDOW_SIZE = 8
-        val TIME_PATTERN = Regex("\\b\\d{1,2}:\\d{2}\\b")
+    companion object {
+        private const val AIRPORT_FLOW_CACHE_MS = 60L * 60L * 1000L
+        private const val MAX_ARRIVALS_FOR_DEMAND = 30
+        private const val MIN_POINTS_FOR_DEMAND = 5
+        private const val MIN_WINDOW_SIZE = 5
+        private const val MAX_WINDOW_SIZE = 8
+        private val TIME_PATTERN = Regex("\\b\\d{1,2}:\\d{2}\\b")
+
+        private var cachedFlightsRawBody: String? = null
+        private var cachedFlightsSavedAtMillis: Long = 0L
+
+        fun cacheFlightsRawBody(rawBody: String) {
+            if (rawBody.isBlank()) return
+            cachedFlightsRawBody = rawBody
+            cachedFlightsSavedAtMillis = System.currentTimeMillis()
+        }
     }
 }

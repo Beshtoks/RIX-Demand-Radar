@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -25,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvEvent3: TextView
     private lateinit var tvAiText: TextView
 
-    private lateinit var btnRefresh: Button
     private lateinit var btnFlights: Button
     private lateinit var btnEvents: Button
     private lateinit var btnForecast: Button
@@ -34,6 +32,9 @@ class MainActivity : AppCompatActivity() {
 
     private val radarDataSource: RadarDataSource = RadarRepositoryProvider.dataSource
     private val startupFallbackDataSource: RadarDataSource = FakeServerRadarRepository()
+
+    private var firstResumeHandled = false
+    private var dashboardLoading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +45,18 @@ class MainActivity : AppCompatActivity() {
 
         render(startupFallbackDataSource.getDashboardState())
         renderDataMode("Режим данных: SERVER / загрузка...")
-        loadDashboardFromServer(showToastOnFinish = false)
+        loadDashboardFromServer()
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (!firstResumeHandled) {
+            firstResumeHandled = true
+            return
+        }
+
+        loadDashboardFromServer()
     }
 
     private fun bindViews() {
@@ -64,7 +76,6 @@ class MainActivity : AppCompatActivity() {
         tvEvent3 = findViewById(R.id.tvEvent3)
         tvAiText = findViewById(R.id.tvAiText)
 
-        btnRefresh = findViewById(R.id.btnRefresh)
         btnFlights = findViewById(R.id.btnFlights)
         btnEvents = findViewById(R.id.btnEvents)
         btnForecast = findViewById(R.id.btnForecast)
@@ -73,7 +84,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindButtons() {
-        btnRefresh.setOnClickListener { performRefresh() }
         btnFlights.setOnClickListener { startActivity(Intent(this, FlightsActivity::class.java)) }
         btnEvents.setOnClickListener { startActivity(Intent(this, EventsActivity::class.java)) }
         btnForecast.setOnClickListener { startActivity(Intent(this, ForecastActivity::class.java)) }
@@ -81,12 +91,10 @@ class MainActivity : AppCompatActivity() {
         btnAi.setOnClickListener { startActivity(Intent(this, AiActivity::class.java)) }
     }
 
-    private fun performRefresh() {
-        setRefreshInProgress(true)
-        loadDashboardFromServer(showToastOnFinish = true)
-    }
+    private fun loadDashboardFromServer() {
+        if (dashboardLoading) return
+        dashboardLoading = true
 
-    private fun loadDashboardFromServer(showToastOnFinish: Boolean) {
         Thread {
             val state = try {
                 radarDataSource.getDashboardState()
@@ -97,22 +105,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             runOnUiThread {
+                dashboardLoading = false
                 render(state)
                 renderDataMode()
-                setRefreshInProgress(false)
-
-                if (showToastOnFinish) {
-                    showStub("Данные обновлены")
-                }
             }
         }.start()
-    }
-
-    private fun setRefreshInProgress(inProgress: Boolean) {
-        if (!::btnRefresh.isInitialized) return
-
-        btnRefresh.isEnabled = !inProgress
-        btnRefresh.text = if (inProgress) "Обновление..." else getString(R.string.button_refresh)
     }
 
     private fun render(state: DashboardUiState) {
@@ -134,9 +131,5 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderDataMode(customText: String? = null) {
         tvDataMode.text = customText ?: "Режим данных: ${RadarRepositoryProvider.currentMode.name}"
-    }
-
-    private fun showStub(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }

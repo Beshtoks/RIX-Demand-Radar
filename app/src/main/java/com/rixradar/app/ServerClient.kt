@@ -23,8 +23,8 @@ class ServerClient {
                     val url = URL(urlString)
                     connection = (url.openConnection() as HttpURLConnection).apply {
                         requestMethod = "GET"
-                        connectTimeout = 15_000
-                        readTimeout = 45_000
+                        connectTimeout = 20_000
+                        readTimeout = 120_000
                         setRequestProperty("Accept", "application/json")
                         setRequestProperty("User-Agent", "RIXDemandRadar-Android/1.0")
                         setRequestProperty("Cache-Control", "no-cache")
@@ -52,7 +52,7 @@ class ServerClient {
                             success = false,
                             url = urlString,
                             rawBody = body,
-                            errorMessage = "HTTP $responseCode"
+                            errorMessage = "HTTP $responseCode from $urlString"
                         )
                     }
                 } catch (e: SocketTimeoutException) {
@@ -60,14 +60,14 @@ class ServerClient {
                         success = false,
                         url = urlString,
                         rawBody = null,
-                        errorMessage = "Timeout while waiting for server response"
+                        errorMessage = "Timeout while waiting for server response: $urlString"
                     )
                 } catch (e: Exception) {
                     ServerFetchResult(
                         success = false,
                         url = urlString,
                         rawBody = null,
-                        errorMessage = e.message ?: e.javaClass.simpleName
+                        errorMessage = (e.message ?: e.javaClass.simpleName) + " URL: $urlString"
                     )
                 } finally {
                     connection?.disconnect()
@@ -76,14 +76,14 @@ class ServerClient {
         )
 
         return try {
-            future.get(60, TimeUnit.SECONDS)
+            future.get(150, TimeUnit.SECONDS)
         } catch (e: TimeoutException) {
             future.cancel(true)
             ServerFetchResult(
                 success = false,
                 url = urlString,
                 rawBody = null,
-                errorMessage = "Client timeout while waiting for backend"
+                errorMessage = "Client timeout while waiting for backend: $urlString"
             )
         } catch (e: Exception) {
             future.cancel(true)
@@ -91,7 +91,7 @@ class ServerClient {
                 success = false,
                 url = urlString,
                 rawBody = null,
-                errorMessage = e.message ?: e.javaClass.simpleName
+                errorMessage = (e.message ?: e.javaClass.simpleName) + " URL: $urlString"
             )
         }
     }

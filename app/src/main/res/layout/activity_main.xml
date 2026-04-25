@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="40dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="24dp"
         android:orientation="vertical">
@@ -251,17 +251,6 @@
                 android:textColor="@color/rr_text_secondary"
                 android:textSize="15sp" />
         </LinearLayout>
-
-        <Button
-            android:id="@+id/btnRefresh"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="18dp"
-            android:backgroundTint="@color/rr_button_refresh"
-            android:text="@string/button_refresh"
-            android:textAllCaps="false"
-            android:textColor="@color/rr_text_primary"
-            android:textSize="16sp" />
 
         <LinearLayout
             android:id="@+id/bottomMenu"
