@@ -88,52 +88,6 @@
                 android:textSize="18sp"
                 android:textStyle="bold" />
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/cardReasons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@color/rr_surface"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/label_reasons"
-                android:textColor="@color/rr_text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvReason1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/reason_flights"
-                android:textColor="@color/rr_text_secondary"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/tvReason2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/reason_event"
-                android:textColor="@color/rr_text_secondary"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/tvReason3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/reason_weather"
-                android:textColor="@color/rr_text_secondary"
-                android:textSize="15sp" />
-        </LinearLayout>
-
         <LinearLayout
             android:id="@+id/cardFlights"
             android:layout_width="match_parent"

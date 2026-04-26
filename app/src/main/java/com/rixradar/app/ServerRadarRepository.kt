@@ -4,6 +4,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 
 class ServerRadarRepository : RadarDataSource {
 
@@ -11,27 +15,32 @@ class ServerRadarRepository : RadarDataSource {
     private val serverClient = ServerClient()
 
     override fun getDashboardState(): DashboardUiState {
-        val response = serverClient.fetch(ServerConfig.DASHBOARD_PATH)
         val fallback = fallbackDataSource.getDashboardState()
+        val airportDemandLines = buildAirportDemandLines(fallback)
+
+        val response = serverClient.fetch(ServerConfig.DASHBOARD_PATH)
 
         if (!response.success) {
             return fallback.copy(
-                updatedText = "Обновлено: server dashboard error"
+                updatedText = if (airportDemandLinesAreReal(airportDemandLines)) {
+                    "Обновлено: потоки из списка прилётов"
+                } else {
+                    "Обновлено: server dashboard error"
+                },
+                flight1Text = airportDemandLines.getOrElse(0) { fallback.flight1Text },
+                flight2Text = airportDemandLines.getOrElse(1) { fallback.flight2Text },
+                flight3Text = airportDemandLines.getOrElse(2) { fallback.flight3Text }
             )
         }
 
         return try {
             val json = JSONObject(response.rawBody ?: "")
-            val airportDemandLines = buildAirportDemandLines(fallback)
 
             DashboardUiState(
                 cityText = json.optStringOrDefault("cityText", fallback.cityText),
                 updatedText = json.optStringOrDefault("updatedText", fallback.updatedText),
                 demandValueText = json.optStringOrDefault("demandValueText", fallback.demandValueText),
                 demandStatusText = json.optStringOrDefault("demandStatusText", fallback.demandStatusText),
-                reason1Text = json.optStringOrDefault("reason1Text", fallback.reason1Text),
-                reason2Text = json.optStringOrDefault("reason2Text", fallback.reason2Text),
-                reason3Text = json.optStringOrDefault("reason3Text", fallback.reason3Text),
                 flight1Text = airportDemandLines.getOrElse(0) { fallback.flight1Text },
                 flight2Text = airportDemandLines.getOrElse(1) { fallback.flight2Text },
                 flight3Text = airportDemandLines.getOrElse(2) { fallback.flight3Text },
@@ -42,9 +51,20 @@ class ServerRadarRepository : RadarDataSource {
             )
         } catch (_: Exception) {
             fallback.copy(
-                updatedText = "Обновлено: dashboard JSON error"
+                updatedText = if (airportDemandLinesAreReal(airportDemandLines)) {
+                    "Обновлено: потоки из списка прилётов"
+                } else {
+                    "Обновлено: dashboard JSON error"
+                },
+                flight1Text = airportDemandLines.getOrElse(0) { fallback.flight1Text },
+                flight2Text = airportDemandLines.getOrElse(1) { fallback.flight2Text },
+                flight3Text = airportDemandLines.getOrElse(2) { fallback.flight3Text }
             )
         }
+    }
+
+    private fun airportDemandLinesAreReal(lines: List<String>): Boolean {
+        return lines.size >= 3 && lines.none { it.contains("недостаточно данных", ignoreCase = true) }
     }
 
     override fun getFlightsState(): FlightsUiState {
@@ -111,7 +131,7 @@ class ServerRadarRepository : RadarDataSource {
     }
 
     private fun buildAirportDemandLines(fallback: DashboardUiState): List<String> {
-        val arrivals = fetchArrivalsForDemand()
+        val arrivals = getCachedArrivalsForDemand()
 
         if (arrivals.size < MIN_POINTS_FOR_DEMAND) {
             return listOf(
@@ -193,41 +213,59 @@ class ServerRadarRepository : RadarDataSource {
         return selected.take(3)
     }
 
-    private fun fetchArrivalsForDemand(): List<ArrivalPoint> {
-        val nowMillis = System.currentTimeMillis()
+    private fun getCachedArrivalsForDemand(): List<ArrivalPoint> {
         val cachedRaw = cachedFlightsRawBody
 
-        if (!cachedRaw.isNullOrBlank() && nowMillis - cachedFlightsSavedAtMillis < AIRPORT_FLOW_CACHE_MS) {
-            val parsed = tryParseArrivals(cachedRaw)
-            if (parsed.isNotEmpty()) {
-                return normalizeArrivalOrder(parsed).take(MAX_ARRIVALS_FOR_DEMAND)
-            }
-        }
-
-        val responses = listOf(
-            serverClient.fetch("/api/real-flights"),
-            serverClient.fetch(ServerConfig.FLIGHTS_PATH)
-        )
-
-        for (response in responses) {
-            if (!response.success || response.rawBody.isNullOrBlank()) continue
-
-            val parsed = tryParseArrivals(response.rawBody)
-            if (parsed.isNotEmpty()) {
-                cacheFlightsRawBody(response.rawBody)
-                return normalizeArrivalOrder(parsed).take(MAX_ARRIVALS_FOR_DEMAND)
+        if (!cachedRaw.isNullOrBlank()) {
+            val selected = selectWorkingArrivals(tryParseArrivals(cachedRaw))
+            if (selected.isNotEmpty()) {
+                return selected
             }
         }
 
         return emptyList()
     }
 
+    private fun selectWorkingArrivals(points: List<ArrivalPoint>): List<ArrivalPoint> {
+        val normalized = normalizeArrivalOrder(points)
+        if (normalized.isEmpty()) return emptyList()
+
+        val now = LocalDateTime.now(RIGA_ZONE).minusHours(1)
+        val today = LocalDate.now(RIGA_ZONE)
+        val targetAbsoluteMinute = when {
+            now.toLocalDate().isBefore(today) -> 0
+            now.toLocalDate().isAfter(today) -> 1440 + now.toLocalTime().toMinuteOfDay()
+            else -> now.toLocalTime().toMinuteOfDay()
+        }
+
+        val startIndex = normalized.indexOfFirst { it.absoluteMinute >= targetAbsoluteMinute }
+            .let { if (it >= 0) it else 0 }
+
+        return normalized.drop(startIndex).take(MAX_ARRIVALS_FOR_DEMAND)
+    }
+
     private fun tryParseArrivals(rawBody: String): List<ArrivalPoint> {
         return try {
             val json = JSONObject(rawBody)
+            val result = mutableListOf<ArrivalPoint>()
+
             val directArray = json.optJSONArray("flights")
             if (directArray != null && directArray.length() > 0) {
-                return parseFlightsArray(directArray)
+                result.addAll(parseFlightsArray(directArray, defaultDayOffset = 0))
+            }
+
+            val todayArray = json.optJSONObject("today")?.optJSONArray("flights")
+            if (todayArray != null && todayArray.length() > 0) {
+                result.addAll(parseFlightsArray(todayArray, defaultDayOffset = 0))
+            }
+
+            val tomorrowArray = json.optJSONObject("tomorrow")?.optJSONArray("flights")
+            if (tomorrowArray != null && tomorrowArray.length() > 0) {
+                result.addAll(parseFlightsArray(tomorrowArray, defaultDayOffset = 1440))
+            }
+
+            if (result.isNotEmpty()) {
+                return dedupeArrivalPoints(result)
             }
 
             parseCompactFlights(json)
@@ -236,22 +274,59 @@ class ServerRadarRepository : RadarDataSource {
         }
     }
 
-    private fun parseFlightsArray(array: JSONArray): List<ArrivalPoint> {
+    private fun parseFlightsArray(array: JSONArray, defaultDayOffset: Int = 0): List<ArrivalPoint> {
         val result = mutableListOf<ArrivalPoint>()
 
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            val time = item.optString("actualTime").ifBlank {
-                item.optString("scheduledTime")
+            val time = item.optString("scheduledTime").ifBlank {
+                item.optString("actualTime")
             }
             val minutes = parseTimeToMinutes(time) ?: continue
+            val explicitDayOffset = dayOffsetFromFlightItem(item)
+            val dayOffset = if (explicitDayOffset != 0) explicitDayOffset else defaultDayOffset
 
             result.add(
                 ArrivalPoint(
                     timeText = time,
-                    minuteOfDay = minutes
+                    minuteOfDay = minutes,
+                    absoluteMinute = minutes + dayOffset
                 )
             )
+        }
+
+        return result
+    }
+
+    private fun dayOffsetFromFlightItem(item: JSONObject): Int {
+        val baseDay = item.optString("_base_day", "").ifBlank {
+            item.optString("flightDate", "")
+        }
+
+        if (baseDay.isBlank()) return 0
+
+        return try {
+            val itemDate = LocalDate.parse(baseDay.take(10))
+            val today = LocalDate.now(RIGA_ZONE)
+            when {
+                itemDate.isAfter(today) -> 1440
+                itemDate.isBefore(today) -> -1440
+                else -> 0
+            }
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    private fun dedupeArrivalPoints(points: List<ArrivalPoint>): List<ArrivalPoint> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<ArrivalPoint>()
+
+        for (point in points.sortedBy { it.absoluteMinute }) {
+            val key = "${point.absoluteMinute}|${point.timeText}"
+            if (seen.add(key)) {
+                result.add(point)
+            }
         }
 
         return result
@@ -281,6 +356,10 @@ class ServerRadarRepository : RadarDataSource {
 
     private fun normalizeArrivalOrder(points: List<ArrivalPoint>): List<ArrivalPoint> {
         if (points.isEmpty()) return emptyList()
+
+        if (points.any { it.absoluteMinute != it.minuteOfDay }) {
+            return points.sortedBy { it.absoluteMinute }
+        }
 
         val normalized = mutableListOf<ArrivalPoint>()
         var dayOffset = 0
@@ -394,6 +473,10 @@ class ServerRadarRepository : RadarDataSource {
         LOW("Низкий поток", "🟩")
     }
 
+    private fun LocalTime.toMinuteOfDay(): Int {
+        return hour * 60 + minute
+    }
+
     companion object {
         private const val AIRPORT_FLOW_CACHE_MS = 60L * 60L * 1000L
         private const val MAX_ARRIVALS_FOR_DEMAND = 30
@@ -401,6 +484,7 @@ class ServerRadarRepository : RadarDataSource {
         private const val MIN_WINDOW_SIZE = 5
         private const val MAX_WINDOW_SIZE = 8
         private val TIME_PATTERN = Regex("\\b\\d{1,2}:\\d{2}\\b")
+        private val RIGA_ZONE: ZoneId = ZoneId.of("Europe/Riga")
 
         private var cachedFlightsRawBody: String? = null
         private var cachedFlightsSavedAtMillis: Long = 0L

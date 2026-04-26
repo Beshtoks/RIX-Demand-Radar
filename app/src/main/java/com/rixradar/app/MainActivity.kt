@@ -13,9 +13,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDataMode: TextView
     private lateinit var tvDemandValue: TextView
     private lateinit var tvDemandStatus: TextView
-    private lateinit var tvReason1: TextView
-    private lateinit var tvReason2: TextView
-    private lateinit var tvReason3: TextView
     private lateinit var tvFlight1: TextView
     private lateinit var tvFlight2: TextView
     private lateinit var tvFlight3: TextView
@@ -65,9 +62,6 @@ class MainActivity : AppCompatActivity() {
         tvDataMode = findViewById(R.id.tvDataMode)
         tvDemandValue = findViewById(R.id.tvDemandValue)
         tvDemandStatus = findViewById(R.id.tvDemandStatus)
-        tvReason1 = findViewById(R.id.tvReason1)
-        tvReason2 = findViewById(R.id.tvReason2)
-        tvReason3 = findViewById(R.id.tvReason3)
         tvFlight1 = findViewById(R.id.tvFlight1)
         tvFlight2 = findViewById(R.id.tvFlight2)
         tvFlight3 = findViewById(R.id.tvFlight3)
@@ -117,9 +111,6 @@ class MainActivity : AppCompatActivity() {
         tvUpdated.text = state.updatedText
         tvDemandValue.text = state.demandValueText
         tvDemandStatus.text = state.demandStatusText
-        tvReason1.text = state.reason1Text
-        tvReason2.text = state.reason2Text
-        tvReason3.text = state.reason3Text
         tvFlight1.text = state.flight1Text
         tvFlight2.text = state.flight2Text
         tvFlight3.text = state.flight3Text

@@ -81,6 +81,16 @@ class EventsActivity : AppCompatActivity() {
     private fun renderCachedEvents() {
         val cachedJson = getCachedEventsJson()
 
+        if (!cachedJson.isNullOrBlank() && isOutdatedEventsWindowCache(cachedJson)) {
+            tvEventsTitle.text = "Events"
+            tvEventsSubtitle.text = "Updating events..."
+            tvEventsBlockTitle.text = "Events in next 30 days"
+            tvEventsHint.text = "Старый кэш мероприятий был рассчитан только на 24 часа. Загружаю диапазон на 30 дней."
+            renderErrorRow("Обновляю сохранённое расписание")
+            refreshEventsFromServer()
+            return
+        }
+
         if (cachedJson.isNullOrBlank()) {
             tvEventsTitle.text = "Events"
             tvEventsSubtitle.text = "Saved events not loaded yet"
@@ -122,6 +132,22 @@ class EventsActivity : AppCompatActivity() {
                 }
             }
         }.start()
+    }
+
+    private fun isOutdatedEventsWindowCache(rawJson: String): Boolean {
+        return try {
+            val json = JSONObject(rawJson)
+            val subtitle = json.optString("subtitle", "")
+            val sourceMode = json.optString("sourceMode", "")
+            val windowStart = json.optString("windowStart", "")
+            val windowEnd = json.optString("windowEnd", "")
+
+            subtitle.contains("+24h", ignoreCase = true) ||
+                sourceMode != "live_events_30d" ||
+                (windowStart.isNotBlank() && windowEnd.isNotBlank() && subtitle.contains("+24", ignoreCase = true))
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun renderRawJson(rawJson: String, fromCache: Boolean) {
@@ -173,6 +199,11 @@ class EventsActivity : AppCompatActivity() {
     }
 
     private fun shouldShowEvent(item: JSONObject): Boolean {
+        val expectedVisitors = item.optInt("expectedVisitors", 0)
+        if (expectedVisitors < MIN_EVENT_VISITORS) {
+            return false
+        }
+
         val venue = item.optString("venue", "").lowercase()
         val headline = item.optString("headline", "").lowercase()
         val eventType = item.optString("eventType", "").lowercase()
@@ -437,5 +468,6 @@ class EventsActivity : AppCompatActivity() {
     companion object {
         private const val PREFS_NAME = "rix_events_cache"
         private const val KEY_EVENTS_JSON = "events_json"
+        private const val MIN_EVENT_VISITORS = 5000
     }
 }

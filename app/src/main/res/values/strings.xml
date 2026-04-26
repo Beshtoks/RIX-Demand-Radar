@@ -10,11 +10,6 @@
     <string name="label_demand_value">82/100</string>
     <string name="label_demand_status">Высокий спрос</string>
 
-    <string name="label_reasons">Причины повышенного спроса</string>
-    <string name="reason_flights">6 международных прилётов</string>
-    <string name="reason_event">Крупное событие в городе</string>
-    <string name="reason_weather">Дождь и прохладная погода</string>
-
     <string name="label_flights">Ближайшие прилёты</string>
     <string name="flight_1">09:55   FR7123   London STN   Прилёт 09:47</string>
     <string name="flight_2">10:20   BT220    Helsinki      Задержка +15 м</string>
