@@ -40,8 +40,6 @@ class ForecastActivity : AppCompatActivity() {
     private lateinit var tvForecastBestWindowTitle: TextView
     private lateinit var tvForecastBestWindowValue: TextView
     private lateinit var tvForecastBestWindowMeta: TextView
-    private lateinit var tvForecastAiTitle: TextView
-    private lateinit var tvForecastAiText: TextView
     private lateinit var tvForecastHint: TextView
 
     private val weatherExecutor = Executors.newSingleThreadExecutor()
@@ -94,8 +92,6 @@ class ForecastActivity : AppCompatActivity() {
         tvForecastBestWindowTitle = findViewById(R.id.tvForecastBestWindowTitle)
         tvForecastBestWindowValue = findViewById(R.id.tvForecastBestWindowValue)
         tvForecastBestWindowMeta = findViewById(R.id.tvForecastBestWindowMeta)
-        tvForecastAiTitle = findViewById(R.id.tvForecastAiTitle)
-        tvForecastAiText = findViewById(R.id.tvForecastAiText)
         tvForecastHint = findViewById(R.id.tvForecastHint)
     }
 
@@ -140,8 +136,6 @@ class ForecastActivity : AppCompatActivity() {
                     bestWindowTitle = "15 дней",
                     bestWindowValue = "Нет данных",
                     bestWindowMeta = "Нажми для подробного прогноза после загрузки",
-                    aiTitle = "Комментарии ИИ",
-                    aiText = "Пока нет погодных данных для комментария.",
                     hint = "Потяни экран вниз, чтобы обновить прогноз"
                 )
             )
@@ -204,8 +198,6 @@ class ForecastActivity : AppCompatActivity() {
                                 bestWindowTitle = "15 дней",
                                 bestWindowValue = "Нет данных",
                                 bestWindowMeta = "Нажми для подробного прогноза после загрузки",
-                                aiTitle = "Комментарии ИИ",
-                                aiText = "Пока нет погодных данных для комментария.",
                                 hint = result.errorMessage ?: "Ошибка сети"
                             )
                         )
@@ -299,8 +291,6 @@ class ForecastActivity : AppCompatActivity() {
                     bestWindowTitle = "15 дней",
                     bestWindowValue = summary.first,
                     bestWindowMeta = summary.second,
-                    aiTitle = "Комментарии ИИ",
-                    aiText = buildAiWeatherComment(today, days),
                     hint = buildHint(fromCache)
                 )
             )
@@ -329,8 +319,6 @@ class ForecastActivity : AppCompatActivity() {
         tvForecastBestWindowTitle.text = state.bestWindowTitle
         tvForecastBestWindowValue.text = state.bestWindowValue
         tvForecastBestWindowMeta.text = state.bestWindowMeta
-        tvForecastAiTitle.text = state.aiTitle
-        tvForecastAiText.text = state.aiText
         tvForecastHint.text = state.hint
     }
 
@@ -452,7 +440,7 @@ class ForecastActivity : AppCompatActivity() {
 
     private fun buildHint(fromCache: Boolean): String {
         val prefix = if (fromCache) "Сохранено локально" else "Обновлено из Open-Meteo"
-        return "$prefix • автообновление не чаще 1 раза в час • потяни вниз для ручного обновления"
+        return "$prefix • автообновление не чаще 1 раза в 30 минут • потяни вниз для ручного обновления"
     }
 
     private fun appendUpdateStatus(current: String, status: String): String {
@@ -544,14 +532,8 @@ class ForecastActivity : AppCompatActivity() {
         private const val WEATHER_CACHE_PREFS = "weather_cache"
         private const val KEY_WEATHER_JSON = "weather_json"
         private const val KEY_WEATHER_FETCHED_AT = "weather_fetched_at"
-        private const val WEATHER_AUTO_REFRESH_MS = 60L * 60L * 1000L
+        private const val WEATHER_AUTO_REFRESH_MS = 30L * 60L * 1000L
         private const val PULL_REFRESH_DISTANCE_DP = 72
-        private const val OPEN_METEO_URL =
-            "https://api.open-meteo.com/v1/forecast" +
-                "?latitude=56.9236" +
-                "&longitude=23.9711" +
-                "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max" +
-                "&timezone=Europe%2FRiga" +
-                "&forecast_days=15"
+        private const val OPEN_METEO_URL: String = "https://api.open-meteo.com/v1/forecast?latitude=56.9236&longitude=23.9711&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&forecast_days=15&timezone=Europe%2FRiga"
     }
 }

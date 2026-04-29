@@ -200,9 +200,7 @@ class LocalRadarRepository : RadarDataSource {
                 bestWindowTitle = "Лучшее окно работы",
                 bestWindowValue = "09:30–10:30",
                 bestWindowMeta = "Утро начинает разгоняться",
-                aiTitle = "Комментарий ИИ",
-                aiText = "Утреннее окно выглядит рабочим. Сильнее всего смотрятся рейсы из Европы и поездки в центр, гостиницы и деловые точки.",
-                hint = "Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика."
+                hint = "Позже здесь появятся почасовой график, реальный расчёт лучших окон и серверная аналитика."
             )
 
             hour in 10..14 -> ForecastUiState(
@@ -220,9 +218,7 @@ class LocalRadarRepository : RadarDataSource {
                 bestWindowTitle = "Лучшее окно работы",
                 bestWindowValue = "10:35–11:25",
                 bestWindowMeta = "Наиболее перспективный интервал по текущей модели",
-                aiTitle = "Комментарий ИИ",
-                aiText = "В ближайший час есть хорошая вероятность усиленного потока у аэропорта. Причина: серия международных прилётов, событие в городе и погодный фактор.",
-                hint = "Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика."
+                hint = "Позже здесь появятся почасовой график, реальный расчёт лучших окон и серверная аналитика."
             )
 
             hour in 15..19 -> ForecastUiState(
@@ -240,9 +236,7 @@ class LocalRadarRepository : RadarDataSource {
                 bestWindowTitle = "Лучшее окно работы",
                 bestWindowValue = "18:20–19:40",
                 bestWindowMeta = "Сильный вечерний интервал",
-                aiTitle = "Комментарий ИИ",
-                aiText = "Сейчас один из самых интересных периодов. Особенно ценны направления в центр, к гостиницам и в сторону Юрмалы.",
-                hint = "Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика."
+                hint = "Позже здесь появятся почасовой график, реальный расчёт лучших окон и серверная аналитика."
             )
 
             else -> ForecastUiState(
@@ -260,59 +254,7 @@ class LocalRadarRepository : RadarDataSource {
                 bestWindowTitle = "Лучшее окно работы",
                 bestWindowValue = "21:30–22:20",
                 bestWindowMeta = "Главное позднее окно",
-                aiTitle = "Комментарий ИИ",
-                aiText = "Ночью уже важнее не массовость, а точность. Лучше делать ставку на отдельные поздние рейсы и не стоять впустую слишком долго.",
-                hint = "Позже здесь появятся почасовой график, реальный индекс спроса, расчёт лучших окон и серверная аналитика."
-            )
-        }
-    }
-
-    override fun getMapState(): MapUiState {
-        val hour = LocalTime.now().hour
-
-        return when {
-            hour in 15..22 -> MapUiState(
-                title = "Карта направлений",
-                subtitle = "Локальный экран. Позже сюда подключим живую карту спроса и направления поездок.",
-                schemeTitle = "Приоритетные зоны",
-                zoneRixTitle = "Аэропорт RIX",
-                zoneRixValue = "Очень высокий интерес",
-                zoneRixMeta = "Вечерние прилёты и основной входящий поток",
-                zoneRigaTitle = "Рига / центр",
-                zoneRigaValue = "Очень высокий интерес",
-                zoneRigaMeta = "Концерты, гостиницы, вечерняя активность",
-                zoneJurmalaTitle = "Юрмала",
-                zoneJurmalaValue = "Высокий интерес",
-                zoneJurmalaMeta = "Туризм и более дорогие направления",
-                zoneSiguldaTitle = "Сигулда",
-                zoneSiguldaValue = "Средний интерес",
-                zoneSiguldaMeta = "Гости вне Риги и выборочные дальние поездки",
-                zoneOgreTitle = "Огре",
-                zoneOgreValue = "Средний интерес",
-                zoneOgreMeta = "Региональные поездки вне основного центра",
-                hint = "Позже здесь появятся живая география спроса, подсветка зон, направления повышенной вероятности и серверная оценка полезности поездок."
-            )
-
-            else -> MapUiState(
-                title = "Карта направлений",
-                subtitle = "Локальный экран. Позже сюда подключим живую карту спроса и направления поездок.",
-                schemeTitle = "Приоритетные зоны",
-                zoneRixTitle = "Аэропорт RIX",
-                zoneRixValue = "Высокий интерес",
-                zoneRixMeta = "Ближайшие прилёты и входящий поток",
-                zoneRigaTitle = "Рига / центр",
-                zoneRigaValue = "Высокий интерес",
-                zoneRigaMeta = "Отели, центр, деловые и городские поездки",
-                zoneJurmalaTitle = "Юрмала",
-                zoneJurmalaValue = "Высокий интерес",
-                zoneJurmalaMeta = "Туризм, сезонные и вечерние маршруты",
-                zoneSiguldaTitle = "Сигулда",
-                zoneSiguldaValue = "Средний интерес",
-                zoneSiguldaMeta = "Выходные, события, гости вне Риги",
-                zoneOgreTitle = "Огре",
-                zoneOgreValue = "Средний интерес",
-                zoneOgreMeta = "Региональные события и часть дальних поездок",
-                hint = "Позже здесь появятся живая география спроса, подсветка зон, направления повышенной вероятности и серверная оценка полезности поездок."
+                hint = "Позже здесь появятся почасовой график, реальный расчёт лучших окон и серверная аналитика."
             )
         }
     }
@@ -406,64 +348,28 @@ class LocalRadarRepository : RadarDataSource {
     private fun buildMorningState(updatedText: String): DashboardUiState {
         return DashboardUiState(
             cityText = "Рига, Латвия",
-            updatedText = updatedText,
-            demandValueText = "74/100",
-            demandStatusText = "Уверенный спрос",
-            flight1Text = "09:15   BT641   Stockholm   По расписанию",
-            flight2Text = "09:40   FR8123  London STN  Прилёт ожидается",
-            flight3Text = "10:05   AY1071  Helsinki    Возможен хороший поток",
-            event1Text = "Рига: деловая активность и гостиницы",
-            event2Text = "Юрмала: ранний туристический интерес",
-            event3Text = "Центр: рост поездок после прилётов",
-            aiText = "Утреннее окно выглядит рабочим. Есть смысл внимательно смотреть прилёты из Европы и готовиться к поездкам в центр и к отелям."
+            updatedText = updatedText
         )
     }
 
     private fun buildDayState(updatedText: String): DashboardUiState {
         return DashboardUiState(
             cityText = "Рига, Латвия",
-            updatedText = updatedText,
-            demandValueText = "82/100",
-            demandStatusText = "Высокий спрос",
-            flight1Text = "10:55   FR7123  London STN  Прилёт 10:47",
-            flight2Text = "11:20   BT220   Helsinki    Задержка +15 минут",
-            flight3Text = "11:45   LO784   Warsaw      По расписанию",
-            event1Text = "Рига: крупное городское событие",
-            event2Text = "Юрмала: повышенный туристический поток",
-            event3Text = "Кипсала: выставочная активность",
-            aiText = "Ближайший дневной интервал выглядит сильно. Если ориентироваться на аэропорт, то лучшее окно сейчас находится в ближайшем часе."
+            updatedText = updatedText
         )
     }
 
     private fun buildEveningState(updatedText: String): DashboardUiState {
         return DashboardUiState(
             cityText = "Рига, Латвия",
-            updatedText = updatedText,
-            demandValueText = "88/100",
-            demandStatusText = "Очень высокий спрос",
-            flight1Text = "18:05   BT317   Amsterdam   Ожидается вовремя",
-            flight2Text = "18:40   LH890   Frankfurt   Хороший деловой рейс",
-            flight3Text = "19:10   DY1082  Oslo        Вероятен сильный выход",
-            event1Text = "Рига: вечернее мероприятие высокого уровня",
-            event2Text = "Юрмала: сильный туристический интерес",
-            event3Text = "Центр: рост вечерних поездок",
-            aiText = "Вечерний интервал выглядит самым сильным за день. Наиболее интересны маршруты в центр, к гостиницам и в сторону Юрмалы."
+            updatedText = updatedText
         )
     }
 
     private fun buildLateState(updatedText: String): DashboardUiState {
         return DashboardUiState(
             cityText = "Рига, Латвия",
-            updatedText = updatedText,
-            demandValueText = "58/100",
-            demandStatusText = "Средний спрос",
-            flight1Text = "21:35   BT654   Copenhagen  Поздний прилёт",
-            flight2Text = "22:10   FR4452  Berlin      По расписанию",
-            flight3Text = "22:45   W62211  Warsaw      Возможен остаточный спрос",
-            event1Text = "Рига: поздний выход после мероприятий",
-            event2Text = "Юрмала: отдельные дорогие маршруты",
-            event3Text = "Ночь: риск пустого ожидания растёт",
-            aiText = "Поздний период уже слабее, чем дневной и вечерний пик. Работать можно, но лучше выбирать моменты точнее и не стоять пусто слишком долго."
+            updatedText = updatedText
         )
     }
 }

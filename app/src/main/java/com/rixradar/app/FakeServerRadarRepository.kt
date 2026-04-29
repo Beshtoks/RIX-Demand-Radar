@@ -4,17 +4,8 @@ class FakeServerRadarRepository : RadarDataSource {
 
     override fun getDashboardState(): DashboardUiState {
         return DashboardUiState(
-            cityText = "Рига, Латвия",
-            updatedText = "Обновлено: серверный режим",
-            demandValueText = "91/100",
-            demandStatusText = "Сервер: очень высокий спрос",
-            flight1Text = "12:05   LH892   Frankfurt   Серверный приоритет",
-            flight2Text = "12:20   BT224   Helsinki    Серверный поток",
-            flight3Text = "12:45   FR7711  London STN  Серверная оценка: высокий",
-            event1Text = "Рига: сервер видит высокий городской интерес",
-            event2Text = "Юрмала: сервер поднимает приоритет",
-            event3Text = "Центр: высокий шанс хороших маршрутов",
-            aiText = "Серверный режим: сейчас один из наиболее перспективных интервалов. Основной интерес — аэропорт, центр, гостиницы и Юрмала."
+            cityText = "RIX / Riga Airport",
+            updatedText = "Обновлено: ожидание данных сервера"
         )
     }
 
@@ -80,33 +71,7 @@ class FakeServerRadarRepository : RadarDataSource {
             bestWindowTitle = "Лучшее окно работы",
             bestWindowValue = "12:10–13:15",
             bestWindowMeta = "Серверная модель считает это главным интервалом",
-            aiTitle = "Комментарий ИИ",
-            aiText = "Серверный тестовый режим считает текущее окно одним из самых интересных. Основной акцент — аэропорт и поездки в центр.",
             hint = "Это тестовый серверный источник. Позже сюда придёт настоящая серверная аналитика."
-        )
-    }
-
-    override fun getMapState(): MapUiState {
-        return MapUiState(
-            title = "Карта направлений",
-            subtitle = "Fake server mode. Позже здесь будет реальная серверная карта.",
-            schemeTitle = "Серверные зоны",
-            zoneRixTitle = "Аэропорт RIX",
-            zoneRixValue = "Очень высокий интерес",
-            zoneRixMeta = "Сервер ставит аэропорт на первое место",
-            zoneRigaTitle = "Рига / центр",
-            zoneRigaValue = "Очень высокий интерес",
-            zoneRigaMeta = "Сервер ждёт хороший городской поток",
-            zoneJurmalaTitle = "Юрмала",
-            zoneJurmalaValue = "Высокий интерес",
-            zoneJurmalaMeta = "Сервер видит хорошие дорогие маршруты",
-            zoneSiguldaTitle = "Сигулда",
-            zoneSiguldaValue = "Средний интерес",
-            zoneSiguldaMeta = "Сервер допускает дальние поездки",
-            zoneOgreTitle = "Огре",
-            zoneOgreValue = "Средний интерес",
-            zoneOgreMeta = "Серверный фоновый интерес",
-            hint = "Это тестовый серверный источник. Позже здесь будет живая оценка направлений."
         )
     }
 

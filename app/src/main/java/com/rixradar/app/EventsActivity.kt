@@ -52,7 +52,7 @@ class EventsActivity : AppCompatActivity() {
         layoutEventsList = findViewById(R.id.layoutEventsList)
         tvEventsHint = findViewById(R.id.tvEventsHint)
 
-        rootScrollView = findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ScrollView
+        rootScrollView = findViewById(R.id.scrollEventsRoot)
     }
 
     private fun bindPullToRefresh() {

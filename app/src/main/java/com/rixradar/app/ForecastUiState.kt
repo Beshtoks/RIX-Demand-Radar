@@ -15,7 +15,5 @@ data class ForecastUiState(
     val bestWindowTitle: String,
     val bestWindowValue: String,
     val bestWindowMeta: String,
-    val aiTitle: String,
-    val aiText: String,
     val hint: String
 )

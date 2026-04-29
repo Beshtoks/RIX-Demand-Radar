@@ -8,7 +8,6 @@ object ServerConfig {
     const val FLIGHTS_PATH = "/api/flights"
     const val EVENTS_PATH = "/api/events"
     const val FORECAST_PATH = "/api/forecast"
-    const val MAP_PATH = "/api/map"
     const val AI_PATH = "/api/ai"
 
     fun buildUrl(path: String): String {

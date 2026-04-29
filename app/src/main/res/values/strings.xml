@@ -2,18 +2,26 @@
 <resources>
     <string name="app_name">RIX Demand Radar</string>
 
-    <string name="title_dashboard">RIX Demand Radar</string>
+    <string name="title_dashboard">RIX — радар прилётов</string>
     <string name="label_city">Рига, Латвия</string>
     <string name="label_updated">Обновлено: 09:40</string>
 
     <string name="label_demand_index">Индекс спроса</string>
-    <string name="label_demand_value">82/100</string>
+    <string name="label_demand_value">82</string>
     <string name="label_demand_status">Высокий спрос</string>
+
+    <string name="label_reasons">Причины повышенного спроса</string>
+    <string name="reason_flights">6 международных прилётов</string>
+    <string name="reason_event">Крупное событие в городе</string>
+    <string name="reason_weather">Дождь и прохладная погода</string>
 
     <string name="label_flights">Ближайшие прилёты</string>
     <string name="flight_1">09:55   FR7123   London STN   Прилёт 09:47</string>
     <string name="flight_2">10:20   BT220    Helsinki      Задержка +15 м</string>
     <string name="flight_3">10:45   LO784    Warsaw        По расписанию</string>
+
+    <string name="label_arrival_radar">Радар прилётов</string>
+    <string name="label_arrival_radar_window">Шаг 5 минут · весь доступный список</string>
 
     <string name="label_events">Значимые события</string>
     <string name="event_1">Концерт крупного уровня в Риге</string>
@@ -24,9 +32,9 @@
     <string name="ai_text">Через 30–40 минут ожидается усиление потока в аэропорту. Рекомендуем ориентироваться на рабочее окно 10:20–10:50.</string>
 
     <string name="button_refresh">Обновить</string>
-    <string name="button_open_flights">Рейсы</string>
-    <string name="button_open_events">События</string>
-    <string name="button_open_forecast">Прогноз</string>
+    <string name="button_open_flights">RIX</string>
+    <string name="button_open_events">REST</string>
+    <string name="button_open_forecast">t C°</string>
     <string name="button_open_map">Карта</string>
     <string name="button_open_ai">ИИ</string>
 

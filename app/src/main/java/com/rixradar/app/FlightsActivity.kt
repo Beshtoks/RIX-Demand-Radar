@@ -1,5 +1,6 @@
 package com.rixradar.app
 
+import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.util.TypedValue
@@ -11,13 +12,18 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 class FlightsActivity : AppCompatActivity() {
@@ -31,6 +37,7 @@ class FlightsActivity : AppCompatActivity() {
     private lateinit var tvFlightsHint: TextView
 
     private val serverClient = ServerClient()
+    private val rigaZone: ZoneId = ZoneId.of("Europe/Riga")
 
     private var isLoadingFlights = false
 
@@ -74,11 +81,17 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     private fun scheduleHourlyFlightsRefresh() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
         val request = PeriodicWorkRequest.Builder(
             FlightsRefreshWorker::class.java,
-            1,
-            TimeUnit.HOURS
-        ).build()
+            FLIGHTS_BACKGROUND_REFRESH_MINUTES,
+            TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .build()
 
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             FLIGHTS_PERIODIC_WORK_NAME,
@@ -137,7 +150,8 @@ class FlightsActivity : AppCompatActivity() {
         }
 
         Thread {
-            val response = serverClient.fetch("/api/real-flights")
+            val endpoint = if (force) "/api/refresh-flights" else "/api/real-flights"
+            val response = serverClient.fetch(endpoint)
 
             runOnUiThread {
                 isLoadingFlights = false
@@ -157,6 +171,21 @@ class FlightsActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
 
+                val freshnessError = validateFreshFlightsResponse(response.rawBody)
+                if (freshnessError != null) {
+                    if (!hasCache) {
+                        tvFlightsSubtitle.text = "Нет свежего расписания"
+                        tvFlightsHint.text = freshnessError
+                        renderErrorRow("Не удалось загрузить свежие рейсы")
+                    } else {
+                        tvFlightsHint.text = appendUpdateStatus(
+                            tvFlightsHint.text.toString(),
+                            freshnessError
+                        )
+                    }
+                    return@runOnUiThread
+                }
+
                 cachePrefs.edit()
                     .putString(KEY_FLIGHTS_JSON, response.rawBody)
                     .putLong(KEY_FLIGHTS_FETCHED_AT, System.currentTimeMillis())
@@ -166,6 +195,26 @@ class FlightsActivity : AppCompatActivity() {
                 renderFlightsFromRawBody(response.rawBody, fromCache = false)
             }
         }.start()
+    }
+
+    private fun validateFreshFlightsResponse(rawBody: String): String? {
+        return try {
+            val json = JSONObject(rawBody)
+            val ok = json.optBoolean("ok", false)
+            val flights = json.optJSONArray("flights")
+            val cacheAgeSeconds = json.optLong("cacheAgeSeconds", 0L)
+            val cacheMode = json.optString("cacheMode", "")
+
+            when {
+                !ok -> json.optString("error", "Backend вернул ошибку")
+                flights == null || flights.length() == 0 -> "Backend вернул пустой список рейсов"
+                cacheMode.startsWith("stale_after") -> "Backend не смог обновить RIX и вернул старый кэш"
+                cacheAgeSeconds >= FLIGHTS_AUTO_REFRESH_MS / 1000L -> "Серверный список старше 60 минут"
+                else -> null
+            }
+        } catch (e: Exception) {
+            e.message ?: "Ошибка проверки свежести ответа"
+        }
     }
 
     private fun renderFlightsFromRawBody(rawBody: String, fromCache: Boolean) {
@@ -261,11 +310,7 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     private fun todayIsoDate(): String {
-        val calendar = java.util.Calendar.getInstance()
-        val year = calendar.get(java.util.Calendar.YEAR)
-        val month = calendar.get(java.util.Calendar.MONTH) + 1
-        val day = calendar.get(java.util.Calendar.DAY_OF_MONTH)
-        return "%04d-%02d-%02d".format(year, month, day)
+        return LocalDate.now(rigaZone).toString()
     }
 
     private fun renderErrorRow(message: String) {
@@ -329,7 +374,7 @@ class FlightsActivity : AppCompatActivity() {
 
         val tvRoute = TextView(this).apply {
             text = route
-            setTextColor(getColor(R.color.rr_text_primary))
+            setTextColor(routeTextColor(item))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTypeface(typeface, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
@@ -408,7 +453,79 @@ class FlightsActivity : AppCompatActivity() {
         return row
     }
 
+    private fun routeTextColor(item: JSONObject): Int {
+        return when (flightImportanceLevel(item)) {
+            5 -> Color.rgb(255, 239, 218)
+            4 -> Color.rgb(255, 248, 218)
+            3 -> Color.rgb(238, 255, 238)
+            2 -> Color.rgb(238, 247, 255)
+            1 -> Color.rgb(238, 238, 238)
+            else -> getColor(R.color.rr_text_primary)
+        }
+    }
+
+    private fun flightImportanceLevel(item: JSONObject): Int {
+        val route = normalizeImportanceText(item.optString("destination", ""))
+        val flightNumber = normalizeImportanceText(item.optString("flightNumber", ""))
+        val status = normalizeImportanceText(item.optString("status", ""))
+
+        var score = 0
+
+        if (containsAny(route, PREMIUM_LONG_DISTANCE_ROUTES)) score += 5
+        if (containsAny(route, STRONG_BUSINESS_ROUTES)) score += 4
+        if (containsAny(route, STRONG_NORDIC_ROUTES)) score += 3
+        if (containsAny(route, STRONG_LEISURE_ROUTES)) score += 3
+        if (containsAny(route, REGIONAL_ROUTES)) score += 2
+        if (containsAny(route, LOW_PRIORITY_ROUTES)) score -= 1
+
+        if (flightNumber.startsWith("BT")) score += 1
+        if (flightNumber.startsWith("LH") || flightNumber.startsWith("KL") ||
+            flightNumber.startsWith("AF") || flightNumber.startsWith("TK") ||
+            flightNumber.startsWith("EK") || flightNumber.startsWith("AY") ||
+            flightNumber.startsWith("LO") || flightNumber.startsWith("SK")
+        ) {
+            score += 1
+        }
+
+        if (status.contains("LANDED") || status.contains("ARRIVED")) score += 1
+        if (status.contains("DELAYED")) score += 1
+        if (status.contains("CANCEL")) score -= 5
+
+        return when {
+            score >= 6 -> 5
+            score == 5 -> 4
+            score in 3..4 -> 3
+            score == 2 -> 2
+            score <= 0 -> 0
+            else -> 1
+        }
+    }
+
+    private fun normalizeImportanceText(value: String): String {
+        return value
+            .uppercase()
+            .replace('Ā', 'A')
+            .replace('Č', 'C')
+            .replace('Ē', 'E')
+            .replace('Ģ', 'G')
+            .replace('Ī', 'I')
+            .replace('Ķ', 'K')
+            .replace('Ļ', 'L')
+            .replace('Ņ', 'N')
+            .replace('Š', 'S')
+            .replace('Ū', 'U')
+            .replace('Ž', 'Z')
+    }
+
+    private fun containsAny(text: String, keywords: Set<String>): Boolean {
+        return keywords.any { keyword -> text.contains(keyword) }
+    }
+
     private fun statusSquareColor(item: JSONObject): Int {
+        if (isActualArrivalOlderThanOneHour(item)) {
+            return R.color.rr_text_primary
+        }
+
         val scheduled = item.optString("scheduledTime", "")
         val actual = item.optString("actualTime", "")
         val status = item.optString("status", "").uppercase()
@@ -435,6 +552,32 @@ class FlightsActivity : AppCompatActivity() {
             }
         } catch (_: Exception) {
             R.color.rr_text_muted
+        }
+    }
+
+    private fun isActualArrivalOlderThanOneHour(item: JSONObject): Boolean {
+        val baseDayText = item.optString("_base_day", "").ifBlank {
+            item.optString("flightDate", "")
+        }
+        val actualText = item.optString("actualTime", "")
+
+        if (baseDayText.length < 10 || actualText.isBlank()) {
+            return false
+        }
+
+        return try {
+            val flightDate = LocalDate.parse(baseDayText.take(10))
+            val actualTime = LocalTime.parse(actualText)
+            val arrivalDateTime = LocalDateTime.of(flightDate, actualTime)
+            val now = LocalDateTime.now(rigaZone)
+
+            if (!arrivalDateTime.isBefore(now)) {
+                return false
+            }
+
+            Duration.between(arrivalDateTime, now).toMinutes() > 60
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -466,5 +609,27 @@ class FlightsActivity : AppCompatActivity() {
         private const val KEY_FLIGHTS_FETCHED_AT = "flights_fetched_at"
         private const val FLIGHTS_AUTO_REFRESH_MS = 60L * 60L * 1000L
         private const val FLIGHTS_PERIODIC_WORK_NAME = "rix_flights_hourly_refresh"
+        private const val FLIGHTS_BACKGROUND_REFRESH_MINUTES = 45L
+
+        private val PREMIUM_LONG_DISTANCE_ROUTES = setOf(
+            "DUBAI", "ABU DHABI", "DOHA", "ISTANBUL", "TEL AVIV", "TASHKENT", "YEREVAN", "BAKU"
+        )
+        private val STRONG_BUSINESS_ROUTES = setOf(
+            "LONDON", "FRANKFURT", "MUNICH", "PARIS", "AMSTERDAM", "ZURICH", "VIENNA", "BRUSSELS",
+            "BERLIN", "HAMBURG", "DUSSELDORF", "WARSAW", "PRAGUE"
+        )
+        private val STRONG_NORDIC_ROUTES = setOf(
+            "STOCKHOLM", "OSLO", "COPENHAGEN", "HELSINKI", "GOTHENBURG", "GOTEBORG", "TALLINN", "VILNIUS"
+        )
+        private val STRONG_LEISURE_ROUTES = setOf(
+            "BARCELONA", "MADRID", "MALAGA", "ALICANTE", "PALMA", "TENERIFE", "LISBON", "ROME", "MILAN",
+            "ATHENS", "LARNACA", "HERAKLION", "NICE"
+        )
+        private val REGIONAL_ROUTES = setOf(
+            "KAUNAS", "PALANGA", "TARTU", "TAMPERE", "GDANSK", "KRAKOW", "BUDAPEST"
+        )
+        private val LOW_PRIORITY_ROUTES = setOf(
+            "CHARTER", "CARGO", "TRAINING", "POSITIONING"
+        )
     }
 }

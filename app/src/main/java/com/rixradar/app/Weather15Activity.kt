@@ -1,6 +1,5 @@
 package com.rixradar.app
 
-import android.graphics.Typeface
 import android.graphics.Color
 import android.os.Bundle
 import android.util.TypedValue
@@ -10,6 +9,7 @@ import android.widget.TextView
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -102,12 +102,37 @@ class Weather15Activity : AppCompatActivity() {
             }
         }
 
+        val topLine = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
         val top = TextView(this).apply {
             text = buildWeatherRowTitle(day)
             setTextColor(getColor(R.color.rr_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            setTypeface(typeface, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
         }
+
+        val weekDay = TextView(this).apply {
+            text = weekDayLabel(day.isoDate)
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        topLine.addView(top)
+        topLine.addView(weekDay)
 
         val meta = TextView(this).apply {
             text = day.metaLine()
@@ -116,7 +141,7 @@ class Weather15Activity : AppCompatActivity() {
             setPadding(0, dp(4), 0, 0)
         }
 
-        row.addView(top)
+        row.addView(topLine)
         row.addView(meta)
         return row
     }
@@ -139,8 +164,11 @@ class Weather15Activity : AppCompatActivity() {
             val middleTemp = (day.maxTemp + day.minTemp) / 2.0
 
             result.setSpan(ForegroundColorSpan(temperatureToColor(day.maxTemp)), maxStart, maxEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            result.setSpan(RelativeSizeSpan(1.25f), maxStart, maxEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             result.setSpan(ForegroundColorSpan(temperatureToColor(middleTemp)), slashStart, slashEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            result.setSpan(RelativeSizeSpan(1.25f), slashStart, slashEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             result.setSpan(ForegroundColorSpan(temperatureToColor(day.minTemp)), minStart, minEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            result.setSpan(RelativeSizeSpan(1.25f), minStart, minEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         return result
@@ -204,6 +232,22 @@ class Weather15Activity : AppCompatActivity() {
             LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("dd.MM"))
         } catch (_: Exception) {
             isoDate
+        }
+    }
+
+    private fun weekDayLabel(isoDate: String): String {
+        return try {
+            when (LocalDate.parse(isoDate).dayOfWeek) {
+                java.time.DayOfWeek.MONDAY -> "Пн"
+                java.time.DayOfWeek.TUESDAY -> "Вт"
+                java.time.DayOfWeek.WEDNESDAY -> "Ср"
+                java.time.DayOfWeek.THURSDAY -> "Чт"
+                java.time.DayOfWeek.FRIDAY -> "Пт"
+                java.time.DayOfWeek.SATURDAY -> "Сб"
+                java.time.DayOfWeek.SUNDAY -> "Вс"
+            }
+        } catch (_: Exception) {
+            ""
         }
     }
 

@@ -20,11 +20,6 @@
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".MapActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
             android:name=".ForecastActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
