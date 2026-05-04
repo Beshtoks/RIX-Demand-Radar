@@ -7,8 +7,11 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -198,34 +201,48 @@ class MainActivity : AppCompatActivity() {
 
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            val time = item.optString("actualTime").ifBlank {
-                item.optString("scheduledTime")
-            }
-            val minutes = parseTimeToMinutes(time) ?: continue
-            val dayOffset = dayOffsetFromFlightItem(item).takeIf { it != 0 } ?: defaultDayOffset
-            result.add(ArrivalRadarView.ArrivalPoint(minutes + dayOffset))
+            val absoluteMinutes = correctedFlightAbsoluteMinutes(item, defaultDayOffset) ?: continue
+            result.add(ArrivalRadarView.ArrivalPoint(absoluteMinutes))
         }
 
         return result
     }
 
-    private fun dayOffsetFromFlightItem(item: JSONObject): Int {
+    private fun correctedFlightAbsoluteMinutes(item: JSONObject, defaultDayOffset: Int): Int? {
+        val referenceTimeText = item.optString("actualTime", "").ifBlank {
+            item.optString("scheduledTime", "")
+        }
+        val referenceMinutes = parseTimeToMinutes(referenceTimeText) ?: return null
         val baseDay = item.optString("_base_day", "").ifBlank {
             item.optString("flightDate", "")
         }
 
-        if (baseDay.isBlank()) return 0
+        if (baseDay.isBlank()) {
+            return referenceMinutes + defaultDayOffset
+        }
 
         return try {
-            val itemDate = LocalDate.parse(baseDay.take(10))
-            val today = LocalDate.now(RIGA_ZONE)
-            when {
-                itemDate.isAfter(today) -> 1440
-                itemDate.isBefore(today) -> -1440
-                else -> 0
+            var referenceDate = LocalDate.parse(baseDay.take(10))
+            val scheduled = item.optString("scheduledTime", "")
+            val actual = item.optString("actualTime", "")
+
+            if (scheduled.isNotBlank() && actual.isNotBlank()) {
+                val scheduledTime = LocalTime.parse(scheduled)
+                val actualTime = LocalTime.parse(actual)
+                val rawDiffMinutes = Duration.between(scheduledTime, actualTime).toMinutes()
+
+                if (rawDiffMinutes > 12L * 60L) {
+                    referenceDate = referenceDate.minusDays(1)
+                } else if (rawDiffMinutes < -12L * 60L) {
+                    referenceDate = referenceDate.plusDays(1)
+                }
             }
+
+            val today = LocalDate.now(RIGA_ZONE)
+            val dayOffset = ChronoUnit.DAYS.between(today, referenceDate).toInt() * 1440
+            referenceMinutes + dayOffset
         } catch (_: Exception) {
-            0
+            referenceMinutes + defaultDayOffset
         }
     }
 

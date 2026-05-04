@@ -23,7 +23,6 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 class FlightsActivity : AppCompatActivity() {
@@ -37,7 +36,6 @@ class FlightsActivity : AppCompatActivity() {
     private lateinit var tvFlightsHint: TextView
 
     private val serverClient = ServerClient()
-    private val rigaZone: ZoneId = ZoneId.of("Europe/Riga")
 
     private var isLoadingFlights = false
 
@@ -275,42 +273,23 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     private fun findWorkingStartIndex(flights: JSONArray): Int {
-        val nowMinusOneHour = LocalTime.now().minusHours(1)
-        var firstTomorrowIndex = -1
+        val nowMinusOneHour = LocalDateTime.now().minusHours(1)
+        var firstFutureIndex = -1
 
         for (i in 0 until flights.length()) {
             val item = flights.optJSONObject(i) ?: continue
-            val baseDay = item.optString("_base_day", "")
-            val scheduled = item.optString("scheduledTime", "")
-            val actual = item.optString("actualTime", "")
-            val referenceTimeText = scheduled.ifBlank { actual }
+            val referenceDateTime = correctedFlightDateTime(item) ?: continue
 
-            if (baseDay.isNotBlank() && baseDay != todayIsoDate()) {
-                if (firstTomorrowIndex < 0) {
-                    firstTomorrowIndex = i
-                }
-                continue
+            if (!referenceDateTime.isBefore(nowMinusOneHour)) {
+                return i
             }
 
-            if (referenceTimeText.isBlank()) {
-                continue
-            }
-
-            try {
-                val referenceTime = LocalTime.parse(referenceTimeText)
-                if (!referenceTime.isBefore(nowMinusOneHour)) {
-                    return i
-                }
-            } catch (_: Exception) {
-                continue
+            if (firstFutureIndex < 0 && referenceDateTime.isAfter(nowMinusOneHour)) {
+                firstFutureIndex = i
             }
         }
 
-        return if (firstTomorrowIndex >= 0) firstTomorrowIndex else 0
-    }
-
-    private fun todayIsoDate(): String {
-        return LocalDate.now(rigaZone).toString()
+        return if (firstFutureIndex >= 0) firstFutureIndex else 0
     }
 
     private fun renderErrorRow(message: String) {
@@ -523,7 +502,7 @@ class FlightsActivity : AppCompatActivity() {
 
     private fun statusSquareColor(item: JSONObject): Int {
         if (isActualArrivalOlderThanOneHour(item)) {
-            return R.color.rr_text_primary
+            return android.R.color.white
         }
 
         val scheduled = item.optString("scheduledTime", "")
@@ -541,7 +520,7 @@ class FlightsActivity : AppCompatActivity() {
         return try {
             val scheduledTime = LocalTime.parse(scheduled)
             val actualTime = LocalTime.parse(actual)
-            val diffMinutes = Duration.between(scheduledTime, actualTime).toMinutes()
+            val diffMinutes = correctedActualDifferenceMinutes(scheduledTime, actualTime)
             val absMinutes = kotlin.math.abs(diffMinutes)
 
             when {
@@ -555,29 +534,67 @@ class FlightsActivity : AppCompatActivity() {
         }
     }
 
-    private fun isActualArrivalOlderThanOneHour(item: JSONObject): Boolean {
-        val baseDayText = item.optString("_base_day", "").ifBlank {
-            item.optString("flightDate", "")
-        }
-        val actualText = item.optString("actualTime", "")
 
-        if (baseDayText.length < 10 || actualText.isBlank()) {
+    private fun correctedActualDifferenceMinutes(scheduledTime: LocalTime, actualTime: LocalTime): Long {
+        var diffMinutes = Duration.between(scheduledTime, actualTime).toMinutes()
+
+        if (diffMinutes > 12L * 60L) {
+            diffMinutes -= 24L * 60L
+        } else if (diffMinutes < -12L * 60L) {
+            diffMinutes += 24L * 60L
+        }
+
+        return diffMinutes
+    }
+
+    private fun isActualArrivalOlderThanOneHour(item: JSONObject): Boolean {
+        if (item.optString("actualTime", "").isBlank()) {
             return false
         }
 
-        return try {
-            val flightDate = LocalDate.parse(baseDayText.take(10))
-            val actualTime = LocalTime.parse(actualText)
-            val arrivalDateTime = LocalDateTime.of(flightDate, actualTime)
-            val now = LocalDateTime.now(rigaZone)
+        val actualDateTime = correctedFlightDateTime(item) ?: return false
+        val now = LocalDateTime.now()
 
-            if (!arrivalDateTime.isBefore(now)) {
-                return false
+        return if (actualDateTime.isAfter(now)) {
+            false
+        } else {
+            Duration.between(actualDateTime, now).toMinutes() > 60L
+        }
+    }
+
+    private fun correctedFlightDateTime(item: JSONObject): LocalDateTime? {
+        val baseDay = item.optString("_base_day", "").ifBlank {
+            item.optString("flightDate", "")
+        }
+        val referenceTimeText = item.optString("actualTime", "").ifBlank {
+            item.optString("scheduledTime", "")
+        }
+
+        if (baseDay.isBlank() || referenceTimeText.isBlank()) {
+            return null
+        }
+
+        return try {
+            var referenceDate = LocalDate.parse(baseDay.take(10))
+            val referenceTime = LocalTime.parse(referenceTimeText)
+            val scheduled = item.optString("scheduledTime", "")
+            val actual = item.optString("actualTime", "")
+
+            if (scheduled.isNotBlank() && actual.isNotBlank()) {
+                val scheduledTime = LocalTime.parse(scheduled)
+                val actualTime = LocalTime.parse(actual)
+                val rawDiffMinutes = Duration.between(scheduledTime, actualTime).toMinutes()
+
+                if (rawDiffMinutes > 12L * 60L) {
+                    referenceDate = referenceDate.minusDays(1)
+                } else if (rawDiffMinutes < -12L * 60L) {
+                    referenceDate = referenceDate.plusDays(1)
+                }
             }
 
-            Duration.between(arrivalDateTime, now).toMinutes() > 60
+            LocalDateTime.of(referenceDate, referenceTime)
         } catch (_: Exception) {
-            false
+            null
         }
     }
 
