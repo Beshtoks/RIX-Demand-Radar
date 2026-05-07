@@ -85,9 +85,6 @@ class ServerRadarRepository : RadarDataSource {
         return fallbackDataSource.getForecastState()
     }
 
-    override fun getAiState(): AiUiState {
-        return fallbackDataSource.getAiState()
-    }
 
     private fun JSONObject.optStringOrDefault(
         key: String,

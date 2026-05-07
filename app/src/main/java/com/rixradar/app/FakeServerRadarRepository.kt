@@ -75,25 +75,4 @@ class FakeServerRadarRepository : RadarDataSource {
         )
     }
 
-    override fun getAiState(): AiUiState {
-        return AiUiState(
-            title = "Совет ИИ",
-            subtitle = "Fake server mode. Позже здесь будет реальный совет от backend.",
-            nowTitle = "Совет на сейчас",
-            nowValue = "Сейчас стоит работать активно",
-            nowMeta = "Серверный режим подтверждает сильный период",
-            windowTitle = "Лучшее окно",
-            windowValue = "12:10–13:15",
-            windowMeta = "Сервер считает это лучшим окном",
-            riskTitle = "Риск пустого ожидания",
-            riskValue = "Низкий",
-            riskMeta = "Сервер видит плотность потока",
-            routesTitle = "Вероятные направления",
-            routesValue = "Центр • гостиницы • Юрмала",
-            routesMeta = "Серверный набор приоритетов",
-            commentTitle = "Пояснение",
-            commentText = "Это тестовый серверный совет. Он показывает, как приложение будет выглядеть после подключения к твоему backend.",
-            hint = "Это тестовый серверный источник. Позже здесь появится настоящий AI-совет."
-        )
-    }
 }

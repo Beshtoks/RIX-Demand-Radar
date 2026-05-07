@@ -86,4 +86,53 @@
 
         </LinearLayout>
     </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/bottomMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@color/rr_surface_2"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:weightSum="3">
+
+        <Button
+            android:id="@+id/btnNavRadar"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_margin="4dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/rr_button_ai"
+            android:text="@string/button_open_radar"
+            android:textAllCaps="false"
+            android:textColor="@color/rr_text_primary"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnNavFlights"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_margin="4dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/rr_button_ai"
+            android:text="@string/button_open_flights"
+            android:textAllCaps="false"
+            android:textColor="@color/rr_text_primary"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnNavForecast"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_margin="4dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/rr_button_ai"
+            android:text="@string/button_open_forecast"
+            android:textAllCaps="false"
+            android:textColor="@color/rr_text_primary"
+            android:textSize="12sp" />
+    </LinearLayout>
+
 </LinearLayout>

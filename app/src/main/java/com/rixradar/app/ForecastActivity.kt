@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.MotionEvent
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -41,6 +42,9 @@ class ForecastActivity : AppCompatActivity() {
     private lateinit var tvForecastBestWindowValue: TextView
     private lateinit var tvForecastBestWindowMeta: TextView
     private lateinit var tvForecastHint: TextView
+    private lateinit var btnNavRadar: Button
+    private lateinit var btnNavFlights: Button
+    private lateinit var btnNavEvents: Button
 
     private val weatherExecutor = Executors.newSingleThreadExecutor()
 
@@ -61,6 +65,7 @@ class ForecastActivity : AppCompatActivity() {
         bindViews()
         bindPullToRefresh()
         bindClicks()
+        bindBottomNavigation()
         renderCachedWeatherOrEmpty()
         refreshIfCacheExpired()
     }
@@ -93,6 +98,9 @@ class ForecastActivity : AppCompatActivity() {
         tvForecastBestWindowValue = findViewById(R.id.tvForecastBestWindowValue)
         tvForecastBestWindowMeta = findViewById(R.id.tvForecastBestWindowMeta)
         tvForecastHint = findViewById(R.id.tvForecastHint)
+        btnNavRadar = findViewById(R.id.btnNavRadar)
+        btnNavFlights = findViewById(R.id.btnNavFlights)
+        btnNavEvents = findViewById(R.id.btnNavEvents)
     }
 
     private fun bindPullToRefresh() {
@@ -113,6 +121,18 @@ class ForecastActivity : AppCompatActivity() {
     private fun bindClicks() {
         blockForecast15Days.setOnClickListener {
             startActivity(Intent(this, Weather15Activity::class.java))
+        }
+    }
+
+    private fun bindBottomNavigation() {
+        btnNavRadar.setOnClickListener {
+            startActivity(Intent(this, MainActivity::class.java))
+        }
+        btnNavFlights.setOnClickListener {
+            startActivity(Intent(this, FlightsActivity::class.java))
+        }
+        btnNavEvents.setOnClickListener {
+            startActivity(Intent(this, EventsActivity::class.java))
         }
     }
 

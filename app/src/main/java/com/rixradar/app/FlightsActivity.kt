@@ -1,5 +1,6 @@
 package com.rixradar.app
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -34,6 +35,9 @@ class FlightsActivity : AppCompatActivity() {
     private lateinit var btnFlightsRefresh: Button
     private lateinit var layoutFlightsList: LinearLayout
     private lateinit var tvFlightsHint: TextView
+    private lateinit var btnNavRadar: Button
+    private lateinit var btnNavEvents: Button
+    private lateinit var btnNavForecast: Button
 
     private val serverClient = ServerClient()
 
@@ -52,6 +56,7 @@ class FlightsActivity : AppCompatActivity() {
 
         bindViews()
         bindRefreshButton()
+        bindBottomNavigation()
         scheduleHourlyFlightsRefresh()
         renderCachedFlightsOrEmpty()
         refreshIfCacheExpired()
@@ -70,11 +75,26 @@ class FlightsActivity : AppCompatActivity() {
         btnFlightsRefresh = findViewById(R.id.btnFlightsRefresh)
         layoutFlightsList = findViewById(R.id.layoutFlightsList)
         tvFlightsHint = findViewById(R.id.tvFlightsHint)
+        btnNavRadar = findViewById(R.id.btnNavRadar)
+        btnNavEvents = findViewById(R.id.btnNavEvents)
+        btnNavForecast = findViewById(R.id.btnNavForecast)
     }
 
     private fun bindRefreshButton() {
         btnFlightsRefresh.setOnClickListener {
             loadFlights(force = true, showLoadingText = true)
+        }
+    }
+
+    private fun bindBottomNavigation() {
+        btnNavRadar.setOnClickListener {
+            startActivity(Intent(this, MainActivity::class.java))
+        }
+        btnNavEvents.setOnClickListener {
+            startActivity(Intent(this, EventsActivity::class.java))
+        }
+        btnNavForecast.setOnClickListener {
+            startActivity(Intent(this, ForecastActivity::class.java))
         }
     }
 

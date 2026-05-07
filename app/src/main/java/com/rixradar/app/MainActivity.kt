@@ -23,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnFlights: Button
     private lateinit var btnEvents: Button
     private lateinit var btnForecast: Button
-    private lateinit var btnAi: Button
 
     private val radarDataSource: RadarDataSource = RadarRepositoryProvider.dataSource
     private val startupFallbackDataSource: RadarDataSource = FakeServerRadarRepository()
@@ -72,14 +71,12 @@ class MainActivity : AppCompatActivity() {
         btnFlights = findViewById(R.id.btnFlights)
         btnEvents = findViewById(R.id.btnEvents)
         btnForecast = findViewById(R.id.btnForecast)
-        btnAi = findViewById(R.id.btnAi)
     }
 
     private fun bindButtons() {
         btnFlights.setOnClickListener { startActivity(Intent(this, FlightsActivity::class.java)) }
         btnEvents.setOnClickListener { startActivity(Intent(this, EventsActivity::class.java)) }
         btnForecast.setOnClickListener { startActivity(Intent(this, ForecastActivity::class.java)) }
-        btnAi.setOnClickListener { startActivity(Intent(this, AiActivity::class.java)) }
     }
 
     private fun loadDashboardFromServer() {

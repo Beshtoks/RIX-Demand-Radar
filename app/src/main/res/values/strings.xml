@@ -28,15 +28,13 @@
     <string name="event_2">Выставка в Кипсале</string>
     <string name="event_3">Повышенный туристический поток в Юрмалу</string>
 
-    <string name="label_ai">Рекомендация ИИ</string>
-    <string name="ai_text">Через 30–40 минут ожидается усиление потока в аэропорту. Рекомендуем ориентироваться на рабочее окно 10:20–10:50.</string>
 
     <string name="button_refresh">Обновить</string>
+    <string name="button_open_radar">RADAR</string>
     <string name="button_open_flights">RIX</string>
     <string name="button_open_events">REST</string>
     <string name="button_open_forecast">t C°</string>
     <string name="button_open_map">Карта</string>
-    <string name="button_open_ai">ИИ</string>
 
     <string name="flights_title">Ближайшие прилёты RIX</string>
     <string name="flights_subtitle">Локальный экран. Позже сюда подключим живые данные сервера.</string>
@@ -105,8 +103,6 @@
     <string name="forecast_best_window_value">Общий прогноз</string>
     <string name="forecast_best_window_meta">Нажми, чтобы открыть подробности</string>
 
-    <string name="forecast_ai_title">Комментарии ИИ</string>
-    <string name="forecast_ai_text">Комментарий появится после загрузки прогноза погоды.</string>
 
     <string name="forecast_hint">Потяни вниз для ручного обновления. Автообновление — не чаще 1 раза в час.</string>
 
@@ -137,29 +133,12 @@
 
     <string name="map_hint">Позже здесь появятся живая география спроса, подсветка зон, направления повышенной вероятности и серверная оценка полезности поездок.</string>
 
-    <string name="ai_screen_title">Совет ИИ</string>
-    <string name="ai_screen_subtitle">Локальный экран. Позже здесь будет живая аналитика от сервера и ИИ.</string>
 
-    <string name="ai_now_title">Совет на сейчас</string>
-    <string name="ai_now_value">Ехать к аэропорту стоит</string>
-    <string name="ai_now_meta">Ближайший интервал выглядит сильнее, чем средний фон дня</string>
 
-    <string name="ai_window_title">Лучшее окно</string>
-    <string name="ai_window_value">10:35–11:25</string>
-    <string name="ai_window_meta">Наиболее благоприятный интервал по текущей модели</string>
 
-    <string name="ai_risk_title">Риск пустого ожидания</string>
-    <string name="ai_risk_value">Средний</string>
-    <string name="ai_risk_meta">После сильного окна есть вероятность локального спада</string>
 
-    <string name="ai_routes_title">Вероятные направления</string>
-    <string name="ai_routes_value">Рига центр • Юрмала • отели</string>
-    <string name="ai_routes_meta">Наиболее интересные цели по текущей симуляции спроса</string>
 
-    <string name="ai_comment_title">Пояснение</string>
-    <string name="ai_comment_text">Основной вывод: в ближайший час аэропорт выглядит выгоднее среднего. Причины: серия международных прилётов, повышенный интерес к Риге и Юрмале, а также погодный фактор.</string>
 
-    <string name="ai_hint">Позже здесь будут реальные советы, расчёт вероятности, объяснение причин, история решений и серверный ИИ-анализ.</string>
 
     <string name="flights_web_title">Официальные рейсы RIX</string>
     <string name="flights_web_loading">Загрузка расписания RIX...</string>

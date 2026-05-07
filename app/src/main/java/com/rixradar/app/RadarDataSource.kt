@@ -5,5 +5,4 @@ interface RadarDataSource {
     fun getFlightsState(): FlightsUiState
     fun getEventsState(): EventsUiState
     fun getForecastState(): ForecastUiState
-    fun getAiState(): AiUiState
 }
