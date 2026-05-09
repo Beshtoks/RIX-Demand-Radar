@@ -12,13 +12,9 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import androidx.appcompat.app.AppCompatActivity
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -300,14 +296,14 @@ class ForecastActivity : AppCompatActivity() {
                     title = "Прогноз погоды",
                     subtitle = if (fromCache) "Сохранённый прогноз" else "Прогноз обновлён",
                     nowTitle = "Сегодня",
-                    nowValue = today?.temperatureLine() ?: "—",
-                    nowMeta = today?.metaLine() ?: "Нет данных",
+                    nowValue = with(WeatherUtils) { today?.temperatureLine() } ?: "—",
+                    nowMeta = with(WeatherUtils) { today?.metaLine() } ?: "Нет данных",
                     hour1Title = "Завтра",
-                    hour1Value = tomorrow?.temperatureLine() ?: "—",
-                    hour1Meta = tomorrow?.metaLine() ?: "Нет данных",
+                    hour1Value = with(WeatherUtils) { tomorrow?.temperatureLine() } ?: "—",
+                    hour1Meta = with(WeatherUtils) { tomorrow?.metaLine() } ?: "Нет данных",
                     hour3Title = "Послезавтра",
-                    hour3Value = afterTomorrow?.temperatureLine() ?: "—",
-                    hour3Meta = afterTomorrow?.metaLine() ?: "Нет данных",
+                    hour3Value = with(WeatherUtils) { afterTomorrow?.temperatureLine() } ?: "—",
+                    hour3Meta = with(WeatherUtils) { afterTomorrow?.metaLine() } ?: "Нет данных",
                     bestWindowTitle = "15 дней",
                     bestWindowValue = summary.first,
                     bestWindowMeta = summary.second,
@@ -348,8 +344,8 @@ class ForecastActivity : AppCompatActivity() {
     }
 
     private fun buildTemperatureRangeSpannable(maxTemp: Double, minTemp: Double): SpannableString {
-        val maxText = formatTemperature(maxTemp)
-        val minText = formatTemperature(minTemp)
+        val maxText = WeatherUtils.formatTemperature(maxTemp)
+        val minText = WeatherUtils.formatTemperature(minTemp)
         val slashText = " / "
         val fullText = maxText + slashText + minText
         val result = SpannableString(fullText)
@@ -359,75 +355,24 @@ class ForecastActivity : AppCompatActivity() {
         val slashStart = maxEnd
         val slashEnd = slashStart + slashText.length
         val minStart = slashEnd
-        val minEnd = fullText.length
         val middleTemp = (maxTemp + minTemp) / 2.0
 
-        result.setSpan(ForegroundColorSpan(temperatureToColor(maxTemp)), maxStart, maxEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        result.setSpan(ForegroundColorSpan(temperatureToColor(middleTemp)), slashStart, slashEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        result.setSpan(ForegroundColorSpan(temperatureToColor(minTemp)), minStart, minEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        result.setSpan(ForegroundColorSpan(WeatherUtils.temperatureToColor(maxTemp)), maxStart, maxEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        result.setSpan(ForegroundColorSpan(WeatherUtils.temperatureToColor(middleTemp)), slashStart, slashEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        result.setSpan(ForegroundColorSpan(WeatherUtils.temperatureToColor(minTemp)), minStart, fullText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         return result
     }
 
-    private fun temperatureToColor(value: Double): Int {
-        if (value.isNaN()) return getColor(R.color.rr_text_primary)
+    private fun parseDailyWeather(daily: JSONObject): List<WeatherDay> =
+        WeatherUtils.parseDailyWeather(daily)
 
-        val clamped = value.coerceIn(-40.0, 40.0)
-        return if (clamped < 0.0) {
-            val t = (-clamped / 40.0).toFloat()
-            interpolateColor(Color.WHITE, Color.rgb(0, 70, 220), t)
-        } else {
-            val t = (clamped / 40.0).toFloat()
-            when {
-                t <= 0.5f -> interpolateColor(Color.WHITE, Color.rgb(255, 215, 0), t / 0.5f)
-                t <= 0.75f -> interpolateColor(Color.rgb(255, 215, 0), Color.rgb(255, 130, 0), (t - 0.5f) / 0.25f)
-                else -> interpolateColor(Color.rgb(255, 130, 0), Color.rgb(220, 0, 0), (t - 0.75f) / 0.25f)
-            }
-        }
-    }
-
-    private fun interpolateColor(startColor: Int, endColor: Int, fraction: Float): Int {
-        val f = fraction.coerceIn(0f, 1f)
-        val a = Color.alpha(startColor) + ((Color.alpha(endColor) - Color.alpha(startColor)) * f).toInt()
-        val r = Color.red(startColor) + ((Color.red(endColor) - Color.red(startColor)) * f).toInt()
-        val g = Color.green(startColor) + ((Color.green(endColor) - Color.green(startColor)) * f).toInt()
-        val b = Color.blue(startColor) + ((Color.blue(endColor) - Color.blue(startColor)) * f).toInt()
-        return Color.argb(a, r, g, b)
-    }
-
-    private fun parseDailyWeather(daily: JSONObject): List<WeatherDay> {
-        val dates = daily.optJSONArray("time") ?: JSONArray()
-        val codes = daily.optJSONArray("weather_code") ?: JSONArray()
-        val tempMax = daily.optJSONArray("temperature_2m_max") ?: JSONArray()
-        val tempMin = daily.optJSONArray("temperature_2m_min") ?: JSONArray()
-        val precipitation = daily.optJSONArray("precipitation_sum") ?: JSONArray()
-        val wind = daily.optJSONArray("wind_speed_10m_max") ?: JSONArray()
-
-        val result = mutableListOf<WeatherDay>()
-
-        for (i in 0 until dates.length()) {
-            val isoDate = dates.optString(i, "")
-            if (isoDate.isBlank()) continue
-            result.add(
-                WeatherDay(
-                    isoDate = isoDate,
-                    displayDate = formatDate(isoDate),
-                    code = codes.optInt(i, 0),
-                    minTemp = tempMin.optDouble(i, Double.NaN),
-                    maxTemp = tempMax.optDouble(i, Double.NaN),
-                    precipitationMm = precipitation.optDouble(i, 0.0),
-                    windKmh = wind.optDouble(i, 0.0)
-                )
-            )
-        }
-        return result
-    }
+    private fun temperatureToColor(value: Double): Int = WeatherUtils.temperatureToColor(value)
 
     private fun buildFifteenDaysSummary(days: List<WeatherDay>): Pair<String, String> {
-        val wetDays = days.count { it.precipitationMm >= 1.0 || it.isRainLike() }
+        val wetDays = days.count { it.precipitationMm >= 1.0 || with(WeatherUtils) { it.isRainLike() } }
         val windyDays = days.count { it.windKmh >= 35.0 }
         val warmDays = days.count { it.maxTemp >= 18.0 }
         val coldDays = days.count { it.maxTemp <= 3.0 }
-
         val main = when {
             wetDays >= 7 -> "Много дождливых дней"
             warmDays >= 7 -> "Много тёплых дней"
@@ -437,25 +382,6 @@ class ForecastActivity : AppCompatActivity() {
         }
         val meta = "Дождь: $wetDays/15 • Ветер: $windyDays/15 • Тёплых: $warmDays/15"
         return main to meta
-    }
-
-    private fun buildAiWeatherComment(today: WeatherDay?, days: List<WeatherDay>): String {
-        if (today == null) return "Погодных данных пока нет."
-
-        val todayImpact = when {
-            today.precipitationMm >= 3.0 -> "Сегодня дождь может усиливать короткие городские поездки."
-            today.windKmh >= 40.0 -> "Сегодня сильный ветер: пешком ходить менее приятно, спрос может быть выше обычного."
-            today.maxTemp >= 18.0 && today.precipitationMm < 1.0 -> "Сегодня хорошая погода: без крупных событий это может помогать поездкам на отдых и прогулки."
-            today.maxTemp <= 3.0 -> "Сегодня холодно: часть пассажиров может чаще выбирать такси."
-            else -> "Сегодня погода нейтральная, сильного погодного перекоса не видно."
-        }
-        val wetDays = days.take(5).count { it.precipitationMm >= 1.0 || it.isRainLike() }
-        val nextDays = if (wetDays >= 3) {
-            "В ближайшие дни часто встречаются осадки — это стоит учитывать вместе с мероприятиями."
-        } else {
-            "На ближайшие дни сильного дождевого фона мало — погода сама по себе не главный фактор."
-        }
-        return "$todayImpact $nextDays"
     }
 
     private fun buildHint(fromCache: Boolean): String {
@@ -468,84 +394,12 @@ class ForecastActivity : AppCompatActivity() {
         return "$base • $status"
     }
 
-    private fun formatDate(isoDate: String): String {
-        return try {
-            LocalDate.parse(isoDate).format(DateTimeFormatter.ofPattern("dd.MM"))
-        } catch (_: Exception) {
-            isoDate
-        }
-    }
-
-    private fun WeatherDay.temperatureLine(): String {
-        return "${formatTemperature(maxTemp)} / ${formatTemperature(minTemp)}"
-    }
-
-    private fun WeatherDay.metaLine(): String {
-        val parts = mutableListOf<String>()
-        parts.add(weatherDescription(code))
-        if (precipitationMm >= 0.1) parts.add("осадки ${formatOneDecimal(precipitationMm)} мм")
-        if (windKmh >= 25.0) parts.add("ветер ${windKmh.toInt()} км/ч")
-        return parts.joinToString(" • ")
-    }
-
-    private fun WeatherDay.isRainLike(): Boolean {
-        return code in setOf(51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99)
-    }
-
-    private fun weatherDescription(code: Int): String {
-        return when (code) {
-            0 -> "ясно"
-            1, 2 -> "переменная облачность"
-            3 -> "пасмурно"
-            45, 48 -> "туман"
-            51, 53, 55 -> "морось"
-            56, 57 -> "ледяная морось"
-            61 -> "небольшой дождь"
-            63 -> "дождь"
-            65 -> "сильный дождь"
-            66, 67 -> "ледяной дождь"
-            71 -> "небольшой снег"
-            73 -> "снег"
-            75 -> "сильный снег"
-            77 -> "снежные зёрна"
-            80 -> "кратковременный дождь"
-            81 -> "ливни"
-            82 -> "сильные ливни"
-            85, 86 -> "снежные заряды"
-            95 -> "гроза"
-            96, 99 -> "гроза с градом"
-            else -> "погода без уточнения"
-        }
-    }
-
-    private fun formatTemperature(value: Double): String {
-        if (value.isNaN()) return "—"
-        val rounded = value.toInt()
-        return if (rounded > 0) "+$rounded°" else "$rounded°"
-    }
-
-    private fun formatOneDecimal(value: Double): String {
-        return String.format(Locale.US, "%.1f", value)
-    }
-
-    private fun dp(value: Int): Float {
-        return value * resources.displayMetrics.density
-    }
+    private fun dp(value: Int): Float = value * resources.displayMetrics.density
 
     private data class WeatherFetchResult(
         val success: Boolean,
         val rawBody: String?,
         val errorMessage: String?
-    )
-
-    private data class WeatherDay(
-        val isoDate: String,
-        val displayDate: String,
-        val code: Int,
-        val minTemp: Double,
-        val maxTemp: Double,
-        val precipitationMm: Double,
-        val windKmh: Double
     )
 
     companion object {

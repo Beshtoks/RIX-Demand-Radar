@@ -44,7 +44,7 @@ class FlightsActivity : AppCompatActivity() {
     private var isLoadingFlights = false
 
     private val cachePrefs by lazy {
-        getSharedPreferences(FLIGHTS_CACHE_PREFS, MODE_PRIVATE)
+        getSharedPreferences(FlightsCacheConfig.PREFS_NAME, MODE_PRIVATE)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,21 +105,21 @@ class FlightsActivity : AppCompatActivity() {
 
         val request = PeriodicWorkRequest.Builder(
             FlightsRefreshWorker::class.java,
-            FLIGHTS_BACKGROUND_REFRESH_MINUTES,
+            FlightsCacheConfig.BACKGROUND_REFRESH_MINUTES,
             TimeUnit.MINUTES
         )
             .setConstraints(constraints)
             .build()
 
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            FLIGHTS_PERIODIC_WORK_NAME,
+            FlightsCacheConfig.PERIODIC_WORK_NAME,
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
     }
 
     private fun renderCachedFlightsOrEmpty() {
-        val cachedBody = cachePrefs.getString(KEY_FLIGHTS_JSON, null)
+        val cachedBody = cachePrefs.getString(FlightsCacheConfig.KEY_JSON, null)
 
         if (cachedBody.isNullOrBlank()) {
             tvFlightsTitle.text = "Прилёты RIX"
@@ -135,9 +135,9 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     private fun refreshIfCacheExpired() {
-        val lastFetchAt = cachePrefs.getLong(KEY_FLIGHTS_FETCHED_AT, 0L)
-        val hasCache = !cachePrefs.getString(KEY_FLIGHTS_JSON, null).isNullOrBlank()
-        val expired = System.currentTimeMillis() - lastFetchAt >= FLIGHTS_AUTO_REFRESH_MS
+        val lastFetchAt = cachePrefs.getLong(FlightsCacheConfig.KEY_FETCHED_AT, 0L)
+        val hasCache = !cachePrefs.getString(FlightsCacheConfig.KEY_JSON, null).isNullOrBlank()
+        val expired = System.currentTimeMillis() - lastFetchAt >= FlightsCacheConfig.AUTO_REFRESH_MS
 
         if (!hasCache || expired) {
             loadFlights(force = false, showLoadingText = !hasCache)
@@ -147,9 +147,9 @@ class FlightsActivity : AppCompatActivity() {
     private fun loadFlights(force: Boolean, showLoadingText: Boolean) {
         if (isLoadingFlights) return
 
-        val lastFetchAt = cachePrefs.getLong(KEY_FLIGHTS_FETCHED_AT, 0L)
-        val hasCache = !cachePrefs.getString(KEY_FLIGHTS_JSON, null).isNullOrBlank()
-        val freshEnough = System.currentTimeMillis() - lastFetchAt < FLIGHTS_AUTO_REFRESH_MS
+        val lastFetchAt = cachePrefs.getLong(FlightsCacheConfig.KEY_FETCHED_AT, 0L)
+        val hasCache = !cachePrefs.getString(FlightsCacheConfig.KEY_JSON, null).isNullOrBlank()
+        val freshEnough = System.currentTimeMillis() - lastFetchAt < FlightsCacheConfig.AUTO_REFRESH_MS
 
         if (!force && hasCache && freshEnough) {
             return
@@ -205,8 +205,8 @@ class FlightsActivity : AppCompatActivity() {
                 }
 
                 cachePrefs.edit()
-                    .putString(KEY_FLIGHTS_JSON, response.rawBody)
-                    .putLong(KEY_FLIGHTS_FETCHED_AT, System.currentTimeMillis())
+                    .putString(FlightsCacheConfig.KEY_JSON, response.rawBody)
+                    .putLong(FlightsCacheConfig.KEY_FETCHED_AT, System.currentTimeMillis())
                     .apply()
 
                 ServerRadarRepository.cacheFlightsRawBody(response.rawBody)
@@ -227,7 +227,7 @@ class FlightsActivity : AppCompatActivity() {
                 !ok -> json.optString("error", "Backend вернул ошибку")
                 flights == null || flights.length() == 0 -> "Backend вернул пустой список рейсов"
                 cacheMode.startsWith("stale_after") -> "Backend не смог обновить RIX и вернул старый кэш"
-                cacheAgeSeconds >= FLIGHTS_AUTO_REFRESH_MS / 1000L -> "Серверный список старше 60 минут"
+                cacheAgeSeconds >= FlightsCacheConfig.AUTO_REFRESH_MS / 1000L -> "Серверный список старше 60 минут"
                 else -> null
             }
         } catch (e: Exception) {
@@ -641,12 +641,6 @@ class FlightsActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val FLIGHTS_CACHE_PREFS = "rix_flights_cache"
-        private const val KEY_FLIGHTS_JSON = "flights_json"
-        private const val KEY_FLIGHTS_FETCHED_AT = "flights_fetched_at"
-        private const val FLIGHTS_AUTO_REFRESH_MS = 60L * 60L * 1000L
-        private const val FLIGHTS_PERIODIC_WORK_NAME = "rix_flights_hourly_refresh"
-        private const val FLIGHTS_BACKGROUND_REFRESH_MINUTES = 45L
 
         private val PREMIUM_LONG_DISTANCE_ROUTES = setOf(
             "DUBAI", "ABU DHABI", "DOHA", "ISTANBUL", "TEL AVIV", "TASHKENT", "YEREVAN", "BAKU"

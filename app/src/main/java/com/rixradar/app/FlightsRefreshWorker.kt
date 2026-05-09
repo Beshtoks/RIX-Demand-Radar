@@ -29,17 +29,17 @@ class FlightsRefreshWorker(
                 flights == null ||
                 flights.length() == 0 ||
                 cacheMode.startsWith("stale_after") ||
-                cacheAgeSeconds >= MAX_ACCEPTED_CACHE_AGE_SECONDS
+                cacheAgeSeconds >= FlightsCacheConfig.AUTO_REFRESH_MS / 1000L
             ) {
                 Result.retry()
             } else {
                 ServerRadarRepository.cacheFlightsRawBody(response.rawBody)
 
                 applicationContext
-                    .getSharedPreferences(FLIGHTS_CACHE_PREFS, Context.MODE_PRIVATE)
+                    .getSharedPreferences(FlightsCacheConfig.PREFS_NAME, Context.MODE_PRIVATE)
                     .edit()
-                    .putString(KEY_FLIGHTS_JSON, response.rawBody)
-                    .putLong(KEY_FLIGHTS_FETCHED_AT, System.currentTimeMillis())
+                    .putString(FlightsCacheConfig.KEY_JSON, response.rawBody)
+                    .putLong(FlightsCacheConfig.KEY_FETCHED_AT, System.currentTimeMillis())
                     .apply()
 
                 Result.success()
@@ -49,10 +49,5 @@ class FlightsRefreshWorker(
         }
     }
 
-    companion object {
-        private const val FLIGHTS_CACHE_PREFS = "rix_flights_cache"
-        private const val KEY_FLIGHTS_JSON = "flights_json"
-        private const val KEY_FLIGHTS_FETCHED_AT = "flights_fetched_at"
-        private const val MAX_ACCEPTED_CACHE_AGE_SECONDS = 60L * 60L
-    }
+    companion object
 }

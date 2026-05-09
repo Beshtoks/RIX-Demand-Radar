@@ -10,12 +10,10 @@ import java.util.concurrent.TimeoutException
 
 class ServerClient {
 
-    private val executor = Executors.newSingleThreadExecutor()
-
     fun fetch(path: String): ServerFetchResult {
         val urlString = ServerConfig.buildUrl(path)
 
-        val future = executor.submit(
+        val future = EXECUTOR.submit(
             Callable {
                 var connection: HttpURLConnection? = null
 
@@ -93,6 +91,17 @@ class ServerClient {
                 rawBody = null,
                 errorMessage = (e.message ?: e.javaClass.simpleName) + " URL: $urlString"
             )
+        }
+    }
+
+    companion object {
+        /**
+         * Общий пул потоков для всех HTTP-запросов приложения.
+         * Один поток — запросы идут последовательно, как и раньше,
+         * но executor создаётся единожды и не течёт.
+         */
+        private val EXECUTOR = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "rix-network").apply { isDaemon = true }
         }
     }
 }
